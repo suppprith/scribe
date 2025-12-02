@@ -7,7 +7,12 @@ import {
   entersState,
 } from "@discordjs/voice";
 import { CONFIG } from "../utils/constants";
-import { startRecording, stopRecording } from "../services/audioService";
+import {
+  startRecording,
+  stopRecording,
+  cleanupRecording,
+} from "../services/audioService";
+import { generateSummaryWithRetry } from "../services/geminiService";
 
 const activeConnections = new Map<string, VoiceConnection>();
 
@@ -118,8 +123,19 @@ async function handleUserLeftChannel(state: VoiceState): Promise<void> {
       console.log(`Left VC ${channelId}`);
 
       if (audioFiles && audioFiles.length > 0) {
-        console.log(`Recorded ${audioFiles.length} audio files`);
-        // TODO: Process summary with audioFiles
+        console.log(`Processing ${audioFiles.length} audio files`);
+
+        const summary = await generateSummaryWithRetry(audioFiles);
+
+        if (summary) {
+          console.log("Summary generated");
+          // TODO: Send to Discord channel
+          console.log(summary);
+        } else {
+          console.log("Failed to generate summary");
+        }
+
+        cleanupRecording(audioFiles);
       }
     } else {
       console.log(`No active connection for guild ${guildId}`);
