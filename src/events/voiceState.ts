@@ -7,6 +7,7 @@ import {
   entersState,
 } from "@discordjs/voice";
 import { CONFIG } from "../utils/constants";
+import { startRecording, stopRecording } from "../services/audioService";
 
 const activeConnections = new Map<string, VoiceConnection>();
 
@@ -88,8 +89,8 @@ async function handleUserJoinedChannel(state: VoiceState): Promise<void> {
       activeConnections.delete(guildId);
     });
 
-    // TODO: Start recording
-    console.log("Ready to record");
+    startRecording(connection, channelId, guildId);
+    console.log("Recording started");
   } catch (error) {
     console.error(`Error joining VC:`, error);
     activeConnections.delete(guildId);
@@ -109,16 +110,17 @@ async function handleUserLeftChannel(state: VoiceState): Promise<void> {
     if (connection) {
       console.log(`Leaving VC ${channelId}`);
 
-      // TODO: Stop recording
-      console.log("Stopping recording");
+      const audioFiles = stopRecording(guildId);
 
       connection.destroy();
       activeConnections.delete(guildId);
 
       console.log(`Left VC ${channelId}`);
 
-      // TODO: Process summary
-      console.log("Processing summary");
+      if (audioFiles && audioFiles.length > 0) {
+        console.log(`Recorded ${audioFiles.length} audio files`);
+        // TODO: Process summary with audioFiles
+      }
     } else {
       console.log(`No active connection for guild ${guildId}`);
     }
