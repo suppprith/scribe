@@ -1,0 +1,32 @@
+# Environment variables
+.env
+.env.local
+
+# Dependencies
+node_modules/
+
+# Build outputs
+dist/
+build/
+
+# Logs
+*.log
+logs/
+
+# Temporary files
+/tmp/
+*.tmp
+
+# IDE
+.vscode/
+.idea/
+*.swp
+*.swo
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Bun
+.bun/
+bun.lockb
