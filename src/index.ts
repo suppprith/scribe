@@ -1,16 +1,13 @@
-/**
- * Scribe - Voice Note Assistant
- * Main entry point for the Discord bot and Hono server
- */
-
 import { Hono } from "hono";
 import { Client, GatewayIntentBits, Events } from "discord.js";
 import { CONFIG } from "./utils/constants";
+import {
+  handleVoiceStateUpdate,
+  cleanupAllConnections,
+} from "./events/voiceState";
 
-// Initialize Hono app for health checks and status endpoint
 const app = new Hono();
 
-// Health check endpoint
 app.get("/", (c) => {
   return c.json({
     status: "online",
@@ -20,7 +17,6 @@ app.get("/", (c) => {
   });
 });
 
-// Status endpoint
 app.get("/status", (c) => {
   const botStatus = client.user
     ? {
@@ -39,7 +35,6 @@ app.get("/status", (c) => {
   });
 });
 
-// Initialize Discord client
 const client = new Client({
   intents: [
     GatewayIntentBits.Guilds,
@@ -49,43 +44,40 @@ const client = new Client({
   ],
 });
 
-// Discord event: Bot is ready
 client.once(Events.ClientReady, (readyClient) => {
-  console.log(`Discord bot logged in as ${readyClient.user.tag}`);
-  console.log(
-    `Monitoring voice activity for user ID: ${CONFIG.TARGET_USER_ID}`
-  );
-  console.log(`Bot is ready to take notes`);
+  console.log(`Logged in as ${readyClient.user.tag}`);
+  console.log(`Monitoring user: ${CONFIG.TARGET_USER_ID}`);
+  console.log(`Ready`);
 });
 
-// Discord event: Error handling
 client.on(Events.Error, (error) => {
-  console.error("Discord client error:", error);
+  console.error("Client error:", error);
 });
 
-// Discord event: Voice state updates (will be implemented in next phase)
 client.on(Events.VoiceStateUpdate, async (oldState, newState) => {
-  // TODO: Implement voice state detection logic
-  // For now, just log the event
-  if (newState.member?.id === CONFIG.TARGET_USER_ID) {
-    if (newState.channelId && !oldState.channelId) {
-      console.log(`Target user joined voice channel: ${newState.channelId}`);
-      // TODO: Join channel and start recording
-    } else if (!newState.channelId && oldState.channelId) {
-      console.log(`Target user left voice channel: ${oldState.channelId}`);
-      // TODO: Stop recording and process summary
-    }
-  }
+  await handleVoiceStateUpdate(oldState, newState);
 });
 
-// Login to Discord
 client.login(CONFIG.DISCORD_TOKEN).catch((error) => {
-  console.error("Failed to login to Discord:", error);
+  console.error("Login failed:", error);
   process.exit(1);
 });
 
-// Start Hono server
-console.log(`Starting Hono server on port ${CONFIG.PORT}...`);
+process.on("SIGINT", () => {
+  console.log("Shutting down...");
+  cleanupAllConnections();
+  client.destroy();
+  process.exit(0);
+});
+
+process.on("SIGTERM", () => {
+  console.log("Shutting down...");
+  cleanupAllConnections();
+  client.destroy();
+  process.exit(0);
+});
+
+console.log(`Starting server on port ${CONFIG.PORT}`);
 
 export default {
   port: CONFIG.PORT,
