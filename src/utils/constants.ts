@@ -1,3 +1,5 @@
+import { tmpdir } from "os";
+
 export const CONFIG = {
   TARGET_USER_ID: process.env.TARGET_USER_ID || "",
   DISCORD_TOKEN: process.env.DISCORD_TOKEN || "",
@@ -8,7 +10,7 @@ export const CONFIG = {
   AUDIO_SAMPLE_RATE: 48000,
   AUDIO_CHANNELS: 2,
   MAX_RECORDING_DURATION_MS: 9 * 60 * 60 * 1000,
-  TEMP_DIR: "/tmp",
+  TEMP_DIR: tmpdir(),
 } as const;
 
 export const PROMPTS = {

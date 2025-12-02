@@ -12,6 +12,7 @@ import {
   stopRecording,
   cleanupRecording,
 } from "../services/audioService";
+import { transcribeAudioWithRetry } from "../services/transcriptionService";
 import { generateSummaryWithRetry } from "../services/geminiService";
 import {
   sendSummaryToChannel,
@@ -60,6 +61,15 @@ async function handleUserJoinedChannel(state: VoiceState): Promise<void> {
 
   console.log(`${username} joined VC ${channelId}`);
 
+  const existingConnection = getVoiceConnection(guildId);
+  if (
+    existingConnection &&
+    existingConnection.state.status !== VoiceConnectionStatus.Destroyed
+  ) {
+    console.log(`Already connected to guild ${guildId}`);
+    return;
+  }
+
   try {
     const connection = joinVoiceChannel({
       channelId: channelId,
@@ -72,12 +82,15 @@ async function handleUserJoinedChannel(state: VoiceState): Promise<void> {
     activeConnections.set(guildId, connection);
 
     try {
-      await entersState(connection, VoiceConnectionStatus.Ready, 30_000);
+      await entersState(connection, VoiceConnectionStatus.Ready, 20_000);
       console.log(`Connected to VC ${channelId}`);
     } catch (error) {
-      console.error(`Failed to connect:`, error);
-      connection.destroy();
+      console.error(`Failed to connect (timeout or aborted):`, error);
+      if (connection.state.status !== VoiceConnectionStatus.Destroyed) {
+        connection.destroy();
+      }
       activeConnections.delete(guildId);
+      sessionStartTimes.delete(guildId);
       return;
     }
 
@@ -90,14 +103,18 @@ async function handleUserJoinedChannel(state: VoiceState): Promise<void> {
         ]);
       } catch (error) {
         console.log(`Permanently disconnected from ${channelId}`);
-        connection.destroy();
+        if (connection.state.status !== VoiceConnectionStatus.Destroyed) {
+          connection.destroy();
+        }
         activeConnections.delete(guildId);
+        sessionStartTimes.delete(guildId);
       }
     });
 
     connection.on(VoiceConnectionStatus.Destroyed, () => {
       console.log(`Connection destroyed for guild ${guildId}`);
       activeConnections.delete(guildId);
+      sessionStartTimes.delete(guildId);
     });
 
     startRecording(connection, channelId, guildId);
@@ -106,6 +123,7 @@ async function handleUserJoinedChannel(state: VoiceState): Promise<void> {
   } catch (error) {
     console.error(`Error joining VC:`, error);
     activeConnections.delete(guildId);
+    sessionStartTimes.delete(guildId);
   }
 }
 
@@ -122,21 +140,52 @@ async function handleUserLeftChannel(state: VoiceState): Promise<void> {
     if (connection) {
       console.log(`Leaving VC ${channelId}`);
 
+      const startTime = sessionStartTimes.get(guildId);
       const audioFiles = stopRecording(guildId);
 
-      connection.destroy();
+      if (connection.state.status !== VoiceConnectionStatus.Destroyed) {
+        connection.destroy();
+      }
       activeConnections.delete(guildId);
 
       console.log(`Left VC ${channelId}`);
 
       if (audioFiles && audioFiles.length > 0) {
-        console.log(`Processing ${audioFiles.length} audio files`);
-
-        const startTime = sessionStartTimes.get(guildId) || Date.now();
-        const duration = Date.now() - startTime;
+        const duration = startTime ? Date.now() - startTime : 0;
         sessionStartTimes.delete(guildId);
 
-        const summary = await generateSummaryWithRetry(audioFiles);
+        const durationInSeconds = Math.round(duration / 1000);
+        const durationInMinutes = durationInSeconds / 60;
+
+        console.log(
+          `Session duration: ${durationInSeconds}s (${durationInMinutes.toFixed(
+            1
+          )} minutes)`
+        );
+
+        if (duration < 2 * 60 * 1000) {
+          console.log("Session < 2 minutes, skipping summary");
+          cleanupRecording(audioFiles);
+          return;
+        }
+
+        console.log(`Processing ${audioFiles.length} audio files`);
+
+        const transcript = await transcribeAudioWithRetry(audioFiles);
+
+        if (!transcript) {
+          console.log("Failed to transcribe audio");
+          await sendErrorNotification(
+            client,
+            "Failed to transcribe meeting audio."
+          );
+          cleanupRecording(audioFiles);
+          return;
+        }
+
+        console.log("Transcription successful, generating summary...");
+
+        const summary = await generateSummaryWithRetry(transcript);
 
         if (summary) {
           console.log("Summary generated");
@@ -146,24 +195,28 @@ async function handleUserLeftChannel(state: VoiceState): Promise<void> {
           if (sent) {
             console.log("Summary sent to Discord");
           } else {
-            console.log("Failed to send to Discord, logging here:");
+            console.log("Failed to send, logging:");
             console.log(summary);
           }
         } else {
           console.log("Failed to generate summary");
           await sendErrorNotification(
             client,
-            "Failed to generate meeting summary. Please check the logs."
+            "Failed to generate meeting summary."
           );
         }
 
         cleanupRecording(audioFiles);
+      } else {
+        sessionStartTimes.delete(guildId);
       }
     } else {
       console.log(`No active connection for guild ${guildId}`);
+      sessionStartTimes.delete(guildId);
     }
   } catch (error) {
     console.error(`Error leaving VC:`, error);
+    sessionStartTimes.delete(guildId);
   }
 }
 
@@ -190,7 +243,9 @@ export function getActiveConnection(
 export function cleanupAllConnections(): void {
   console.log(`Cleaning up ${activeConnections.size} connections`);
   for (const [guildId, connection] of activeConnections.entries()) {
-    connection.destroy();
+    if (connection.state.status !== VoiceConnectionStatus.Destroyed) {
+      connection.destroy();
+    }
     activeConnections.delete(guildId);
   }
 }
