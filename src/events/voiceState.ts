@@ -13,8 +13,14 @@ import {
   cleanupRecording,
 } from "../services/audioService";
 import { generateSummaryWithRetry } from "../services/geminiService";
+import {
+  sendSummaryToChannel,
+  sendErrorNotification,
+} from "../services/messageService";
+import { client } from "../index";
 
 const activeConnections = new Map<string, VoiceConnection>();
+const sessionStartTimes = new Map<string, number>();
 
 export async function handleVoiceStateUpdate(
   oldState: VoiceState,
@@ -95,6 +101,7 @@ async function handleUserJoinedChannel(state: VoiceState): Promise<void> {
     });
 
     startRecording(connection, channelId, guildId);
+    sessionStartTimes.set(guildId, Date.now());
     console.log("Recording started");
   } catch (error) {
     console.error(`Error joining VC:`, error);
@@ -125,14 +132,29 @@ async function handleUserLeftChannel(state: VoiceState): Promise<void> {
       if (audioFiles && audioFiles.length > 0) {
         console.log(`Processing ${audioFiles.length} audio files`);
 
+        const startTime = sessionStartTimes.get(guildId) || Date.now();
+        const duration = Date.now() - startTime;
+        sessionStartTimes.delete(guildId);
+
         const summary = await generateSummaryWithRetry(audioFiles);
 
         if (summary) {
           console.log("Summary generated");
-          // TODO: Send to Discord channel
-          console.log(summary);
+
+          const sent = await sendSummaryToChannel(client, summary, duration);
+
+          if (sent) {
+            console.log("Summary sent to Discord");
+          } else {
+            console.log("Failed to send to Discord, logging here:");
+            console.log(summary);
+          }
         } else {
           console.log("Failed to generate summary");
+          await sendErrorNotification(
+            client,
+            "Failed to generate meeting summary. Please check the logs."
+          );
         }
 
         cleanupRecording(audioFiles);

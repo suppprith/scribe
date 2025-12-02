@@ -44,6 +44,8 @@ const client = new Client({
   ],
 });
 
+export { client };
+
 client.once(Events.ClientReady, (readyClient) => {
   console.log(`Logged in as ${readyClient.user.tag}`);
   console.log(`Monitoring user: ${CONFIG.TARGET_USER_ID}`);
