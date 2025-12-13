@@ -5,6 +5,11 @@ import {
   handleVoiceStateUpdate,
   cleanupAllConnections,
 } from "./events/voiceState";
+import sodium from "libsodium-wrappers";
+
+// Initialize sodium for voice encryption
+await sodium.ready;
+console.log("Libsodium initialized");
 
 const app = new Hono();
 

@@ -4,7 +4,8 @@ import { CONFIG } from "../utils/constants";
 export async function sendSummaryToChannel(
   client: Client,
   summary: string,
-  duration: number
+  duration: number,
+  driveUrl?: string
 ): Promise<boolean> {
   try {
     const channelId = CONFIG.MEETING_NOTES_CHANNEL_ID;
@@ -21,14 +22,30 @@ export async function sendSummaryToChannel(
       return false;
     }
 
+    const durationMinutes = Math.round(duration / 60000);
+    const durationSeconds = Math.round((duration % 60000) / 1000);
+    const durationText =
+      durationMinutes > 0
+        ? `${durationMinutes}m ${durationSeconds}s`
+        : `${durationSeconds}s`;
+
     const embed = new EmbedBuilder()
-      .setColor(0x0099ff)
-      .setTitle("Meeting Summary")
-      .setDescription(summary)
+      .setColor(0x5865f2) // Discord blurple
+      .setTitle("📝 Meeting Summary")
+      .setDescription(summary.slice(0, 4000)) // Discord embed limit
       .setTimestamp()
       .setFooter({
-        text: `Duration: ${Math.round(duration / 1000)}s`,
+        text: `Duration: ${durationText}`,
       });
+
+    // Add recording link if available
+    if (driveUrl) {
+      embed.addFields({
+        name: "🎙️ Recording",
+        value: `[Listen on Google Drive](${driveUrl})`,
+        inline: false,
+      });
+    }
 
     await channel.send({ embeds: [embed] });
     console.log(`Summary sent to channel ${channelId}`);
@@ -57,8 +74,8 @@ export async function sendErrorNotification(
     }
 
     const embed = new EmbedBuilder()
-      .setColor(0xff0000)
-      .setTitle("Error Processing Meeting")
+      .setColor(0xed4245) // Red
+      .setTitle("⚠️ Error Processing Meeting")
       .setDescription(errorMessage)
       .setTimestamp();
 
