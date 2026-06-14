@@ -20,7 +20,7 @@ scribe is a monorepo of three cooperating services.
 
 ```
 ┌──────────────────┐   per-speaker audio chunks (HTTP)   ┌────────────────────────┐
-│       bot/       │ ──────────────────────────────────► │        backend/        │
+│       bot/       │ ──────────────────────────────────► │        server/         │
 │  Bun + discord.js│   ◄──── text · translation ──────── │   Python + FastAPI     │
 │                  │   ◄──── summary ─────────────────── │   · speech-to-text     │
 │  · voice capture │                                     │   · translation        │
@@ -31,7 +31,7 @@ scribe is a monorepo of three cooperating services.
          │ WebSocket (live captions, status, summaries)
          ▼
 ┌──────────────────┐
-│    frontend/     │  live captions per speaker · transcripts · summaries · search
+│     client/      │  live captions per speaker · transcripts · summaries · search
 │     Next.js      │
 └──────────────────┘
          │
@@ -41,9 +41,9 @@ scribe is a monorepo of three cooperating services.
 ### Data flow
 
 1. A user joins a watched voice channel → the **bot** auto-joins and begins per-speaker recording, opening a session.
-2. The bot slices each speaker's audio into short chunks and sends them to the **backend**, which transcribes (and, where needed, translates) them.
-3. Each result is stored (SQLite) and broadcast over a **WebSocket** to the **frontend**, where it appears as a live caption attributed to the speaker.
-4. When the last participant leaves, the bot assembles the full transcript and asks the backend to summarize it.
+2. The bot slices each speaker's audio into short chunks and sends them to the **server**, which transcribes (and, where needed, translates) them.
+3. Each result is stored (SQLite) and broadcast over a **WebSocket** to the **client**, where it appears as a live caption attributed to the speaker.
+4. When the last participant leaves, the bot assembles the full transcript and asks the server to summarize it.
 5. The summary is posted to the Discord channel and the dashboard, and the audio, transcript, and summary are archived to **Google Drive**.
 
 ### Components
@@ -51,8 +51,8 @@ scribe is a monorepo of three cooperating services.
 | Folder | Service | Stack | Responsibility |
 |--------|---------|-------|----------------|
 | `bot/` | Discord bot | Bun, TypeScript, discord.js, @discordjs/voice | Auto-join, per-speaker voice capture, session lifecycle, SQLite store, WebSocket server, Discord delivery |
-| `backend/` | NLP service | Python, FastAPI, faster-whisper, MarianMT/CTranslate2, NLTK, spaCy, gensim, scikit-learn | Speech-to-text, translation, text analysis, and summarization |
-| `frontend/` | Web dashboard | Next.js, TypeScript | Live captions, transcript & session history, summaries, search |
+| `server/` | NLP service | Python, FastAPI, faster-whisper, MarianMT/CTranslate2, NLTK, spaCy, gensim, scikit-learn | Speech-to-text, translation, text analysis, and summarization |
+| `client/` | Web dashboard | Next.js, TypeScript | Live captions, transcript & session history, summaries, search |
 
 ### Why self-hosted
 
@@ -60,7 +60,7 @@ Speech and language processing both run locally on CPU (int8) via CTranslate2 �
 
 ## NLP capabilities → product features
 
-scribe's language features are built from a set of focused NLP capabilities. Each is a real, self-contained module in `backend/`, and each powers a concrete product feature:
+scribe's language features are built from a set of focused NLP capabilities. Each is a real, self-contained module in `server/`, and each powers a concrete product feature:
 
 | NLP capability | What it powers in scribe |
 |----------------|--------------------------|
@@ -80,8 +80,8 @@ scribe's language features are built from a set of focused NLP capabilities. Eac
 ```
 scribe/
 ├── bot/        # Discord bot — voice capture, sessions, WebSocket, SQLite
-├── backend/    # NLP service — speech-to-text, translation, analysis, summarization
-└── frontend/   # Web dashboard — live captions, transcripts, summaries, search
+├── server/     # NLP service — speech-to-text, translation, analysis, summarization
+└── client/     # Web dashboard — live captions, transcripts, summaries, search
 ```
 
 Each service has its own README with setup instructions.

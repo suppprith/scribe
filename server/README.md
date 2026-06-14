@@ -1,4 +1,4 @@
-# backend/
+# server/
 
 The NLP service — all speech and language processing for scribe.
 

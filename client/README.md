@@ -1,4 +1,4 @@
-# frontend/
+# client/
 
 The web dashboard — scribe's user-facing surface.
 
@@ -12,7 +12,7 @@ The web dashboard — scribe's user-facing surface.
 - Search transcripts (keyword and meaning-based)
 - Toggle between original and translated text
 
-The frontend is a thin client of the bot's HTTP API + WebSocket; it holds no
+The client is a thin consumer of the bot's HTTP API + WebSocket; it holds no
 business logic of its own.
 
 ## Setup
