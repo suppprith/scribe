@@ -1,121 +1,95 @@
-# Scribe - Voice Note Assistant
+# scribe
 
-A Discord meeting assistant that automatically joins voice channels, records conversations, uploads to Google Drive, and generates structured summaries using Google Gemini AI.
+**A self-hosted meeting-intelligence assistant for Discord.** scribe automatically joins designated voice channels, records every participant on their own track, and turns live conversation into speaker-attributed captions on a web dashboard. When the call ends it generates a structured summary, posts it to Discord, and archives the audio and transcript to Google Drive.
 
-## Features
+Everything that touches language — speech-to-text, analysis, translation, and summarization — runs on a **self-hosted NLP pipeline with no paid cloud AI dependencies**. There is no external LLM in the loop; summaries are produced by scribe's own natural-language-generation engine.
 
-- **Automatic Operation**: Joins when target user joins a voice channel
-- **High-Quality Recording**: Captures audio and converts to MP3
-- **Google Drive Integration**: Automatically uploads recordings to your Drive folder
-- **AI Summaries**: Generates structured meeting notes using Gemini 1.5 Flash
-- **Discord Integration**: Posts summaries with recording links to your specified channel
-- **Privacy-Focused**: Only records when target user is present, auto-deletes local files
+## What it does
 
-## Flow
+- **Auto-records the channels you choose.** Admins mark which voice channels scribe should watch. The moment someone joins a watched channel, scribe joins and starts recording — no manual command needed.
+- **Per-speaker capture.** Each participant is recorded as a separate audio stream, so every word is correctly attributed to who said it.
+- **Live captions on the web.** As people talk, captions stream to a web dashboard in real time, grouped and labelled per speaker.
+- **Translation.** Non-English speech is transcribed in its original language and translated, so everyone's contribution is readable in one language.
+- **Custom summaries.** When everyone leaves, scribe builds a structured summary — key topics, decisions, action items, and highlights — using its own NLP pipeline, and posts it to the Discord channel and the dashboard.
+- **Searchable history.** Past meetings, full transcripts, and summaries are browsable and searchable (both keyword and meaning-based search).
+- **Archived to Drive.** Raw audio, transcripts, and summaries are uploaded to Google Drive automatically, with links surfaced in Discord and on the web.
+
+## Architecture
+
+scribe is a monorepo of three cooperating services.
 
 ```
-User Joins VC → Bot Joins & Records → User Leaves → Stop Recording
-    → Merge Audio → Convert to MP3 → Upload to Google Drive
-    → Generate AI Summary → Post to Discord (with Drive link)
+┌──────────────────┐   per-speaker audio chunks (HTTP)   ┌────────────────────────┐
+│       bot/       │ ──────────────────────────────────► │        backend/        │
+│  Bun + discord.js│   ◄──── text · translation ──────── │   Python + FastAPI     │
+│                  │   ◄──── summary ─────────────────── │   · speech-to-text     │
+│  · voice capture │                                     │   · translation        │
+│  · sessions      │                                     │   · NLP analysis       │
+│  · WebSocket     │                                     │   · summarization      │
+│  · SQLite        │                                     └────────────────────────┘
+└────────┬─────────┘
+         │ WebSocket (live captions, status, summaries)
+         ▼
+┌──────────────────┐
+│    frontend/     │  live captions per speaker · transcripts · summaries · search
+│     Next.js      │
+└──────────────────┘
+         │
+         ▼   Google Drive — audio · transcripts · summaries
 ```
 
-## Tech Stack
+### Data flow
 
-- **Runtime**: Bun (v1.1+)
-- **Server**: Hono
-- **Discord**: discord.js v14 + @discordjs/voice
-- **LLM**: Google Gemini 1.5 Flash
-- **Audio**: prism-media + ffmpeg-static (WAV/MP3 format)
-- **Cloud Storage**: Google Drive API
+1. A user joins a watched voice channel → the **bot** auto-joins and begins per-speaker recording, opening a session.
+2. The bot slices each speaker's audio into short chunks and sends them to the **backend**, which transcribes (and, where needed, translates) them.
+3. Each result is stored (SQLite) and broadcast over a **WebSocket** to the **frontend**, where it appears as a live caption attributed to the speaker.
+4. When the last participant leaves, the bot assembles the full transcript and asks the backend to summarize it.
+5. The summary is posted to the Discord channel and the dashboard, and the audio, transcript, and summary are archived to **Google Drive**.
 
-## Setup
+### Components
 
-### Prerequisites
+| Folder | Service | Stack | Responsibility |
+|--------|---------|-------|----------------|
+| `bot/` | Discord bot | Bun, TypeScript, discord.js, @discordjs/voice | Auto-join, per-speaker voice capture, session lifecycle, SQLite store, WebSocket server, Discord delivery |
+| `backend/` | NLP service | Python, FastAPI, faster-whisper, MarianMT/CTranslate2, NLTK, spaCy, gensim, scikit-learn | Speech-to-text, translation, text analysis, and summarization |
+| `frontend/` | Web dashboard | Next.js, TypeScript | Live captions, transcript & session history, summaries, search |
 
-- [Bun](https://bun.sh) installed
-- [FFmpeg](https://ffmpeg.org/) installed and in PATH
-- Discord Bot Token ([Discord Developer Portal](https://discord.com/developers/applications))
-- Google Gemini API Key ([Google AI Studio](https://makersuite.google.com/app/apikey))
-- Google Cloud Service Account (for Drive uploads)
-- Your Discord User ID
+### Why self-hosted
 
-### Installation
+Speech and language processing both run locally on CPU (int8) via CTranslate2 — the same runtime powers transcription and translation. There is no per-minute API cost, no third party receives the audio, and the whole stack runs on modest hardware.
 
-1. Clone the repository:
+## NLP capabilities → product features
 
-```bash
-git clone https://github.com/suppprith/scribe.git
-cd scribe
+scribe's language features are built from a set of focused NLP capabilities. Each is a real, self-contained module in `backend/`, and each powers a concrete product feature:
+
+| NLP capability | What it powers in scribe |
+|----------------|--------------------------|
+| Tokenization & sentence segmentation | Splitting transcripts into clean units for every downstream step |
+| Text normalization (stemming & lemmatization) | Robust keyword matching and search |
+| Frequency analysis, stop-word filtering & POS tagging | Keyword and topic extraction |
+| Syntactic parsing | Action-item and decision detection |
+| N-gram language modeling | Phrase modeling and prediction |
+| Word-sense disambiguation | In-context glossary and definitions |
+| Template-based natural language generation | Meeting summaries (no external LLM) |
+| Machine translation | Multilingual transcripts and captions |
+| Information retrieval (TF-IDF / vector space) | Transcript search and ranking |
+| Word embeddings | Semantic ("meaning-based") search and topic clustering |
+
+## Repository structure
+
+```
+scribe/
+├── bot/        # Discord bot — voice capture, sessions, WebSocket, SQLite
+├── backend/    # NLP service — speech-to-text, translation, analysis, summarization
+└── frontend/   # Web dashboard — live captions, transcripts, summaries, search
 ```
 
-2. Install dependencies:
+Each service has its own README with setup instructions.
 
-```bash
-bun install
-```
+## Status
 
-3. Configure environment variables:
+scribe is under active development. Work is tracked in Linear.
 
-```bash
-cp .env.example .env
-```
+## License
 
-Edit `.env` and fill in your credentials:
-
-```env
-# Discord
-DISCORD_TOKEN=your_discord_bot_token_here
-TARGET_USER_ID=your_discord_user_id_here
-MEETING_NOTES_CHANNEL_ID=your_channel_id_here
-
-# Gemini AI
-GEMINI_API_KEY=your_gemini_api_key_here
-
-# Google Drive
-GOOGLE_SERVICE_ACCOUNT_EMAIL=your-service-account@project.iam.gserviceaccount.com
-GOOGLE_PRIVATE_KEY="-----BEGIN PRIVATE KEY-----\n...\n-----END PRIVATE KEY-----\n"
-GOOGLE_DRIVE_FOLDER_ID=your_folder_id_here
-```
-
-### Google Cloud Setup
-
-1. Go to [Google Cloud Console](https://console.cloud.google.com)
-2. Create a new project (or select existing)
-3. Enable the **Google Drive API**
-4. Go to Credentials → Create Credentials → Service Account
-5. Download the JSON key file
-6. Copy `client_email` to `GOOGLE_SERVICE_ACCOUNT_EMAIL`
-7. Copy `private_key` to `GOOGLE_PRIVATE_KEY`
-8. Create a folder in Google Drive for recordings
-9. Share the folder with the service account email (Editor access)
-10. Copy the folder ID from the URL to `GOOGLE_DRIVE_FOLDER_ID`
-
-### Getting Your Discord User ID
-
-1. Enable Developer Mode in Discord (User Settings → Advanced → Developer Mode)
-2. Right-click your username and select "Copy User ID"
-
-### Running the Bot
-
-Development mode (with hot reload):
-
-```bash
-bun run dev
-```
-
-Production mode:
-
-```bash
-bun run start
-```
-
-## Usage
-
-1. Invite the bot to your Discord server
-2. Grant it permissions: View Channels, Connect, Speak
-3. When you (the target user) join a voice channel, the bot automatically:
-   - Joins the same channel
-   - Starts recording
-   - Leaves when you leave
-   - Converts recording to MP3 and uploads to Google Drive
-   - Sends a summary to your meeting notes channel with the Drive link
+MIT
