@@ -21,4 +21,26 @@ Each capability is a self-contained module with both an HTTP endpoint and a
 standalone runnable script.
 
 ## Setup
-_To be scaffolded._
+
+From this folder, create an isolated virtual environment and install deps:
+
+```bash
+cd server
+python -m venv .venv
+# Windows:        .venv\Scripts\activate
+# macOS / Linux:  source .venv/bin/activate
+pip install -r requirements.txt
+cp .env.example .env
+```
+
+Run the service:
+
+```bash
+uvicorn app.main:app --reload --port 8000
+```
+
+Then `GET http://localhost:8000/health` returns `{"status":"ok",...}`.
+
+Only the web framework + config deps are pinned for now; the ML stack
+(faster-whisper, NLTK, spaCy, gensim, scikit-learn) is added in its own
+Phase 2 tickets so the scaffold installs fast.

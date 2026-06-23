@@ -1,0 +1,10 @@
+# scribe NLP service — scaffold dependencies.
+# Web framework + config only. The heavy ML stack (faster-whisper, ctranslate2,
+# nltk, spacy, gensim, scikit-learn) is added in its own Phase 2 tickets so the
+# scaffold installs fast and the service starts without model downloads.
+
+fastapi>=0.115,<1.0
+uvicorn[standard]>=0.30,<1.0
+pydantic>=2.7,<3.0
+pydantic-settings>=2.3,<3.0
+python-dotenv>=1.0,<2.0
