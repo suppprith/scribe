@@ -1,4 +1,5 @@
 import { Client, Events, GatewayIntentBits } from "discord.js";
+import { AudioChunker, ChunkQueue } from "./audio";
 import { config } from "./config";
 import { initDb } from "./db";
 import { handleInteraction } from "./discord/interactions";
@@ -12,16 +13,23 @@ const client = new Client({
   intents: [GatewayIntentBits.Guilds, GatewayIntentBits.GuildVoiceStates],
 });
 
+// Captured utterances → silence-aware WAV chunks → queue for the Phase 3
+// transcription loop.
+const chunkQueue = new ChunkQueue();
+const chunker = new AudioChunker({
+  onChunk: (chunk) => {
+    chunkQueue.enqueue(chunk);
+    console.log(
+      `[scribe] queued chunk ${chunk.userId}#${chunk.seq} (${chunk.wav.length}B WAV) ` +
+        `from ${chunk.username} in session ${chunk.sessionId}`,
+    );
+  },
+});
+
 const sessionManager = new SessionManager({
   gateway: createDiscordVoiceGateway({
     client,
-    onSegment: (segment) => {
-      // Phase 2/3: chunk and send to the NLP service for transcription.
-      console.log(
-        `[scribe] captured ${segment.pcm.length}B (16kHz mono) from ${segment.username} ` +
-          `in session ${segment.sessionId}`,
-      );
-    },
+    onSegment: (segment) => chunker.push(segment),
   }),
   onSessionEnd: (info) => {
     // Phase 5/6: assemble transcript → summarize → deliver to Discord → archive.

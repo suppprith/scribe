@@ -88,6 +88,15 @@ attributed. Segments flow to an `onSegment` hook, which later phases chunk and
 send to the NLP service. (Receiving needs an Opus + encryption backend —
 `opusscript` and `libsodium-wrappers` ship as dependencies.)
 
+### Chunking ([`src/audio/`](src/audio))
+
+`AudioChunker` turns each captured utterance into ASR-ready pieces: utterances
+longer than ~5s are split at the quietest 20 ms frame between 4–5s, so cuts land
+on natural pauses rather than mid-word. Each piece is encoded as a 16 kHz mono
+WAV (faster-whisper's input format) and tagged with `sessionId`, `userId`,
+`username`, a per-speaker `seq`, and interpolated `tsStart`/`tsEnd`. Chunks are
+pushed to a `ChunkQueue` — an async FIFO the Phase 3 transcription loop drains.
+
 ## Data layer (SQLite)
 
 The bot owns a local SQLite database (`bun:sqlite`, path `DB_PATH`). It is
