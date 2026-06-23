@@ -30,6 +30,7 @@ python -m venv .venv
 # Windows:        .venv\Scripts\activate
 # macOS / Linux:  source .venv/bin/activate
 pip install -r requirements.txt
+python scripts/download_models.py   # NLTK data + spaCy en_core_web_sm (one-time)
 cp .env.example .env
 ```
 
@@ -41,6 +42,20 @@ uvicorn app.main:app --reload --port 8000
 
 Then `GET http://localhost:8000/health` returns `{"status":"ok",...}`.
 
-Only the web framework + config deps are pinned for now; the ML stack
-(faster-whisper, NLTK, spaCy, gensim, scikit-learn) is added in its own
-Phase 2 tickets so the scaffold installs fast.
+Whisper ASR weights download lazily on first transcription, so they aren't
+fetched by the script above. All Python deps ship as wheels (no compiler) and
+run on CPU + int8 within the 8 GB budget.
+
+## Layout
+
+```
+server/app/
+├── main.py        # FastAPI app, lifespan, /health
+├── config.py      # typed settings (model names, device, compute type)
+├── logging.py     # structured logging
+├── api/           # HTTP routers
+├── asr/           # speech-to-text (faster-whisper)
+├── nlp/           # the NLP capability modules
+└── pipeline/      # orchestration (transcript → summary)
+scripts/download_models.py   # one-command NLTK + spaCy download
+```
