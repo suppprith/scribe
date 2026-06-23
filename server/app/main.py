@@ -11,6 +11,7 @@ from collections.abc import AsyncIterator
 from fastapi import FastAPI
 
 from app.api.asr import router as asr_router
+from app.api.nlp import router as nlp_router
 from app.api.routes import router
 from app.config import settings
 from app.logging import configure_logging, get_logger
@@ -34,6 +35,7 @@ async def lifespan(app: FastAPI) -> AsyncIterator[None]:
 app = FastAPI(title="scribe NLP service", version="0.0.0", lifespan=lifespan)
 app.include_router(router)
 app.include_router(asr_router)
+app.include_router(nlp_router)
 
 
 @app.get("/health")

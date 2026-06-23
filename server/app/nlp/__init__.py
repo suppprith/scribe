@@ -1,3 +1,6 @@
-"""NLP modules: tokenization, normalization, keyword/POS extraction, parsing,
-n-gram modeling, word-sense disambiguation, IR search, embeddings, and the
-template-based NLG summarizer. Each lands as its own Phase 2 module."""
+"""NLP capability modules: each is a pure-function module reused by both an HTTP
+endpoint (app/api/nlp.py) and a standalone demo script (scripts/nlp/)."""
+
+from app.nlp.tokenize import tokenize
+
+__all__ = ["tokenize"]

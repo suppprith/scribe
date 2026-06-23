@@ -91,3 +91,17 @@ accurate but **English-only** — use them only for English-only servers.
 
 On the 8 GB host, `base` live + `small` final keeps peak RAM well within budget
 alongside the bot and (later) the MT models.
+
+## NLP modules
+
+Each language capability is a pure-function module in [`app/nlp/`](app/nlp),
+reused by both an HTTP endpoint (`app/api/nlp.py`) and a standalone demo script
+(`scripts/nlp/`) you can run directly to see sample input/output.
+
+| Capability | Endpoint | Demo | Powers |
+|------------|----------|------|--------|
+| Tokenization | `POST /nlp/tokenize` | `scripts/nlp/tokenize_demo.py` | transcript segmentation |
+
+```bash
+python scripts/nlp/tokenize_demo.py
+```
