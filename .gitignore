@@ -22,6 +22,9 @@ out/
 build/
 dist/
 
+# TypeScript
+*.tsbuildinfo
+
 # Environment
 .env
 .env.*

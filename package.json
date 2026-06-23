@@ -1,0 +1,19 @@
+{
+  "name": "scribe",
+  "version": "0.0.0",
+  "private": true,
+  "description": "Self-hosted meeting-intelligence assistant for Discord.",
+  "workspaces": [
+    "shared",
+    "bot",
+    "client"
+  ],
+  "scripts": {
+    "typecheck": "bun run --filter '*' typecheck",
+    "dev:bot": "bun run --filter @scribe/bot dev",
+    "dev:client": "bun run --filter @scribe/client dev"
+  },
+  "engines": {
+    "bun": ">=1.2.0"
+  }
+}

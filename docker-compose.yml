@@ -1,0 +1,43 @@
+# Dev convenience: run the NLP server + Discord bot together.
+#
+#   docker compose up
+#
+# Source is mounted for live editing and dependencies install on first start.
+# Copy the env templates first:
+#   cp bot/.env.example bot/.env
+#   cp server/.env.example server/.env
+#
+# This is a starting point — production would add per-service Dockerfiles.
+
+services:
+  server:
+    image: python:3.11-slim
+    working_dir: /app/server
+    command: sh -c "pip install --no-cache-dir -r requirements.txt && uvicorn app.main:app --host 0.0.0.0 --port 8000"
+    volumes:
+      - ./server:/app/server
+    env_file:
+      - path: ./server/.env
+        required: false
+    ports:
+      - "8000:8000"
+
+  bot:
+    image: oven/bun:1.2
+    working_dir: /app
+    command: sh -c "bun install && bun run --filter @scribe/bot start"
+    volumes:
+      - ./:/app
+      - bot_node_modules:/app/node_modules
+    env_file:
+      - path: ./bot/.env
+        required: false
+    environment:
+      - SERVER_URL=http://server:8000
+    depends_on:
+      - server
+    ports:
+      - "8080:8080"
+
+volumes:
+  bot_node_modules:
