@@ -3,7 +3,7 @@ import { config } from "./config";
 import { initDb } from "./db";
 import { handleInteraction } from "./discord/interactions";
 import { registerCommands } from "./discord/registerCommands";
-import { SessionManager, createVoiceStateHandler, discordVoiceGateway } from "./voice";
+import { SessionManager, createDiscordVoiceGateway, createVoiceStateHandler } from "./voice";
 
 // Config is validated on import; bring up the data layer before Discord.
 initDb();
@@ -13,7 +13,16 @@ const client = new Client({
 });
 
 const sessionManager = new SessionManager({
-  gateway: discordVoiceGateway,
+  gateway: createDiscordVoiceGateway({
+    client,
+    onSegment: (segment) => {
+      // Phase 2/3: chunk and send to the NLP service for transcription.
+      console.log(
+        `[scribe] captured ${segment.pcm.length}B (16kHz mono) from ${segment.username} ` +
+          `in session ${segment.sessionId}`,
+      );
+    },
+  }),
   onSessionEnd: (info) => {
     // Phase 5/6: assemble transcript → summarize → deliver to Discord → archive.
     console.log(`[scribe] session ${info.sessionId} ready for the end-of-session pipeline`);

@@ -10,6 +10,7 @@ export interface VoiceConnectionLike {
 /** Abstracts joining a voice channel so the manager is testable without Discord. */
 export interface VoiceGateway {
   join(params: {
+    sessionId: string;
     guildId: string;
     channelId: string;
     adapterCreator: DiscordGatewayAdapterCreator;
@@ -116,6 +117,7 @@ export class SessionManager {
         startedAt: this.now(),
       });
       const connection = this.gateway.join({
+        sessionId,
         guildId: params.guildId,
         channelId: params.channelId,
         adapterCreator: params.adapterCreator,

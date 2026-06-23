@@ -76,6 +76,18 @@ for the transcript → summary → storage pipeline (later phases). The voice
 gateway and timer scheduler are injectable, which keeps the lifecycle unit-testable
 without a live Discord connection.
 
+### Per-speaker capture
+
+While a session is connected, `SessionCapture` subscribes to each speaker
+independently via `connection.receiver`. A user's Opus is decoded (prism-media)
+and resampled from 48 kHz stereo to **16 kHz mono PCM** — the format Whisper
+wants — then emitted as a `CapturedSegment` tagged with `userId`, `username`,
+and start/end timestamps when their utterance ends (after ~800 ms of silence).
+Each speaker is a separate subscription, so overlapping speech stays cleanly
+attributed. Segments flow to an `onSegment` hook, which later phases chunk and
+send to the NLP service. (Receiving needs an Opus + encryption backend —
+`opusscript` and `libsodium-wrappers` ship as dependencies.)
+
 ## Data layer (SQLite)
 
 The bot owns a local SQLite database (`bun:sqlite`, path `DB_PATH`). It is
