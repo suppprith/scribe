@@ -60,6 +60,22 @@ channels are auto-recorded, per guild, persisted to `guild_config`:
 Commands are registered on startup — scoped to `DISCORD_DEV_GUILD_ID` if set
 (instant updates), otherwise globally. Registration needs `DISCORD_CLIENT_ID`.
 
+## Recording sessions
+
+[`src/voice/`](src/voice) turns voice activity into sessions. When the first
+non-bot user enters a **watched** channel the bot auto-joins and opens a session
+row; further users are registered as participants without re-joining. When the
+last real user leaves, the session ends after a **grace period** (default 30s) —
+a quick rejoin cancels it, so brief disconnects don't split a meeting. Channel
+moves are handled as a leave-then-join.
+
+The `SessionManager` keys state by `guild:channel`, so multiple servers and
+channels record concurrently in isolation. On end it persists `endedAt`, tears
+down the voice connection, and fires an `onSessionEnd` hook — the entry point
+for the transcript → summary → storage pipeline (later phases). The voice
+gateway and timer scheduler are injectable, which keeps the lifecycle unit-testable
+without a live Discord connection.
+
 ## Data layer (SQLite)
 
 The bot owns a local SQLite database (`bun:sqlite`, path `DB_PATH`). It is
