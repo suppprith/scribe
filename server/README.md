@@ -109,6 +109,20 @@ reused by both an HTTP endpoint (`app/api/nlp.py`) and a standalone demo script
 | IR search (TF-IDF + P/R/F/MAP) | `POST /nlp/search`, `/nlp/ir-metrics` | `scripts/nlp/ir_demo.py` | transcript search + extractive ranking |
 | Template NLG summarizer | `POST /nlp/nlg` | `scripts/nlp/nlg_demo.py` | meeting summaries (no external LLM) |
 
+### Summarization pipeline
+
+`POST /summarize` chains the modules into one structured summary — the full
+custom replacement for an external LLM:
+
+```
+tokenize → keywords/POS → action items (parse) → extractive highlights (TF-IDF) → template NLG
+```
+
+Send a `transcript` (and/or per-speaker `utterances`, optional `participants`
+and `duration_seconds`); get back `{ overview, topics, keywords, decisions,
+action_items, highlights, prose }`. Deterministic, CPU-only, and graceful on
+short/empty input. Demo: `python scripts/summarize_demo.py`.
+
 ```bash
 python scripts/nlp/tokenize_demo.py
 python scripts/nlp/normalize_demo.py
