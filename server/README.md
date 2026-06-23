@@ -101,7 +101,9 @@ reused by both an HTTP endpoint (`app/api/nlp.py`) and a standalone demo script
 | Capability | Endpoint | Demo | Powers |
 |------------|----------|------|--------|
 | Tokenization | `POST /nlp/tokenize` | `scripts/nlp/tokenize_demo.py` | transcript segmentation |
+| Normalization (stem vs lemma) | `POST /nlp/normalize` | `scripts/nlp/normalize_demo.py` | search / keyword matching |
 
 ```bash
 python scripts/nlp/tokenize_demo.py
+python scripts/nlp/normalize_demo.py
 ```
