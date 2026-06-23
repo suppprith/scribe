@@ -166,6 +166,14 @@ export class SessionManager {
     }
   }
 
+  /** End every active session immediately — for graceful shutdown. */
+  endAll(): void {
+    for (const [key, session] of [...this.active.entries()]) {
+      console.log(`[scribe] session ${session.sessionId} ended in ${key} (shutdown)`);
+      this.teardown(key, session);
+    }
+  }
+
   private endSession(key: string): void {
     const session = this.active.get(key);
     if (!session) return;
@@ -174,14 +182,21 @@ export class SessionManager {
       session.endTimer = undefined;
       return;
     }
-
-    sessions.end(session.sessionId, this.now());
-    session.connection.destroy();
-    this.active.delete(key);
     console.log(`[scribe] session ${session.sessionId} ended in ${key}`);
+    this.teardown(key, session);
+  }
 
+  /** Persist the end, tear down the connection, and fire the pipeline hook. */
+  private teardown(key: string, session: ActiveSession): void {
+    if (session.endTimer !== undefined) {
+      this.scheduler.clear(session.endTimer);
+      session.endTimer = undefined;
+    }
+    sessions.end(session.sessionId, this.now());
     // Stop capture is implicit in destroy(); hand off to the end-of-session
     // pipeline (transcript → summary → storage) once those phases land.
+    session.connection.destroy();
+    this.active.delete(key);
     this.onSessionEnd?.({
       sessionId: session.sessionId,
       guildId: session.guildId,

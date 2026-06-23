@@ -70,9 +70,11 @@ a quick rejoin cancels it, so brief disconnects don't split a meeting. Channel
 moves are handled as a leave-then-join.
 
 The `SessionManager` keys state by `guild:channel`, so multiple servers and
-channels record concurrently in isolation. On end it persists `endedAt`, tears
-down the voice connection, and fires an `onSessionEnd` hook — the entry point
-for the transcript → summary → storage pipeline (later phases). The voice
+channels record concurrently in isolation, and channel moves are handled without
+orphaning a connection. On end it persists `endedAt`, tears down the voice
+connection, and fires an `onSessionEnd` hook — the entry point for the
+transcript → summary → storage pipeline (later phases). On `SIGINT`/`SIGTERM`
+the bot ends every active session and disconnects cleanly. The voice
 gateway and timer scheduler are injectable, which keeps the lifecycle unit-testable
 without a live Discord connection.
 

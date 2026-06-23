@@ -45,4 +45,17 @@ client.once(Events.ClientReady, async (c) => {
 client.on(Events.InteractionCreate, handleInteraction);
 client.on(Events.VoiceStateUpdate, createVoiceStateHandler(sessionManager));
 
+// Graceful shutdown: end every active session and disconnect cleanly.
+const shutdown = async (signal: NodeJS.Signals) => {
+  console.log(`[scribe] ${signal} received — shutting down`);
+  try {
+    sessionManager.endAll();
+    await client.destroy();
+  } finally {
+    process.exit(0);
+  }
+};
+process.once("SIGINT", shutdown);
+process.once("SIGTERM", shutdown);
+
 await client.login(config.discordToken);
