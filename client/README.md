@@ -16,4 +16,22 @@ The client is a thin consumer of the bot's HTTP API + WebSocket; it holds no
 business logic of its own.
 
 ## Setup
-_To be scaffolded._
+
+From the repo root, install all workspaces once:
+
+```bash
+bun install
+```
+
+Then run the dashboard:
+
+```bash
+cp client/.env.example client/.env
+bun run --filter @scribe/client dev   # http://localhost:3000
+# or, from this folder:
+cd client && bun run dev
+```
+
+`bun run build` / `bun run start` for a production build. The shared types
+package (`@scribe/shared`) is consumed directly via the workspace and
+transpiled by Next (`transpilePackages`).
