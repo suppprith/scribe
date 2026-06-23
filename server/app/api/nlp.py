@@ -8,6 +8,7 @@ from pydantic import BaseModel, Field
 from app.nlp.ir import TfidfIndex, evaluate
 from app.nlp.keywords import keywords
 from app.nlp.ngram import train as train_ngram
+from app.nlp.nlg import generate_summary
 from app.nlp.normalize import normalize_text
 from app.nlp.parse import parse
 from app.nlp.tokenize import tokenize
@@ -206,3 +207,28 @@ class IrMetricsResult(BaseModel):
 def nlp_ir_metrics(body: IrMetricsIn) -> IrMetricsResult:
     queries = [{"query": q.query, "relevant": q.relevant} for q in body.queries]
     return IrMetricsResult(**evaluate(body.documents, queries, body.top_n))
+
+
+class ActionItemIn(BaseModel):
+    text: str
+    owner: str | None = None
+
+
+class NlgIn(BaseModel):
+    participants: list[str] = []
+    duration_seconds: float | None = None
+    keywords: list[str] = []
+    topics: list[str] = []
+    decisions: list[str] = []
+    action_items: list[ActionItemIn] = []
+    highlights: list[str] = []
+
+
+class NlgResult(BaseModel):
+    overview: str
+    prose: str
+
+
+@router.post("/nlg", response_model=NlgResult)
+def nlp_nlg(body: NlgIn) -> NlgResult:
+    return NlgResult(**generate_summary(body.model_dump(exclude_none=True)))

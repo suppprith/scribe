@@ -107,6 +107,7 @@ reused by both an HTTP endpoint (`app/api/nlp.py`) and a standalone demo script
 | N-gram language model | `POST /nlp/predict`, `/nlp/sentence-probability` | `scripts/nlp/ngram_demo.py` | phrase modeling over transcripts |
 | Word-sense disambiguation (Lesk) | `POST /nlp/disambiguate` | `scripts/nlp/wordnet_demo.py` | in-meeting glossary / definitions |
 | IR search (TF-IDF + P/R/F/MAP) | `POST /nlp/search`, `/nlp/ir-metrics` | `scripts/nlp/ir_demo.py` | transcript search + extractive ranking |
+| Template NLG summarizer | `POST /nlp/nlg` | `scripts/nlp/nlg_demo.py` | meeting summaries (no external LLM) |
 
 ```bash
 python scripts/nlp/tokenize_demo.py
@@ -116,4 +117,5 @@ python scripts/nlp/parse_demo.py
 python scripts/nlp/ngram_demo.py
 python scripts/nlp/wordnet_demo.py
 python scripts/nlp/ir_demo.py
+python scripts/nlp/nlg_demo.py
 ```

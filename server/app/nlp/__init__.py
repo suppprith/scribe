@@ -4,6 +4,7 @@ endpoint (app/api/nlp.py) and a standalone demo script (scripts/nlp/)."""
 from app.nlp.ir import TfidfIndex, rank_sentences
 from app.nlp.keywords import keywords
 from app.nlp.ngram import NgramModel
+from app.nlp.nlg import generate_summary
 from app.nlp.normalize import normalize_text
 from app.nlp.parse import parse
 from app.nlp.tokenize import tokenize
@@ -18,4 +19,5 @@ __all__ = [
     "disambiguate",
     "TfidfIndex",
     "rank_sentences",
+    "generate_summary",
 ]
