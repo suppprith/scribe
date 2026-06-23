@@ -1,5 +1,9 @@
 import { Client, Events, GatewayIntentBits } from "discord.js";
 import { config } from "./config";
+import { initDb } from "./db";
+
+// Config is validated on import; bring up the data layer before Discord.
+initDb();
 
 const client = new Client({
   intents: [GatewayIntentBits.Guilds, GatewayIntentBits.GuildVoiceStates],

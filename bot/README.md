@@ -35,5 +35,45 @@ bun run --filter @scribe/bot dev     # watch mode
 cd bot && bun run dev
 ```
 
-`bun run start` runs without watch. Without a `DISCORD_TOKEN` the bot logs a
-notice and exits cleanly. Type-check with `bun run typecheck`.
+`bun run start` runs without watch. Type-check with `bun run typecheck`.
+
+## Configuration
+
+Config is read once at boot by [`src/config.ts`](src/config.ts), validated, and
+imported as a typed `config` object everywhere (never raw `process.env`). If a
+required variable is missing or invalid, the bot prints a single message listing
+every problem and exits — see [`.env.example`](.env.example) for all variables.
+`DISCORD_TOKEN` is the only hard requirement; the rest have sensible defaults.
+
+## Data layer (SQLite)
+
+The bot owns a local SQLite database (`bun:sqlite`, path `DB_PATH`). It is
+created and migrated on boot — migrations are idempotent (`CREATE TABLE IF NOT
+EXISTS`), so re-running is safe. `PRAGMA foreign_keys = ON` and WAL journaling
+are enabled. Conventions: ids are `TEXT`, timestamps are epoch-ms `INTEGER`,
+booleans are `0/1`, structured values are JSON `TEXT`.
+
+| Table | Purpose | Key columns |
+|-------|---------|-------------|
+| `guild_config` | Per-guild settings | `guild_id` (PK), `watched_vc_ids` (JSON), `summary_channel_id` |
+| `sessions` | One recording session | `id` (PK), `guild_id`, `channel_id`, `status`, `started_at`, `ended_at` |
+| `participants` | Speakers in a session | (`session_id`, `user_id`) PK, `username`, `joined_at`, `left_at` |
+| `captions` | Live/partial + final captions | `id` (PK), `session_id`, `user_id`, `text`, `ts_start`, `ts_end`, `is_final` |
+| `transcripts` | Assembled transcript | `session_id` (PK), `full_text`, `per_user_json` (JSON) |
+| `summaries` | Generated summary | `session_id` (PK), `structured_json` (JSON), `posted_to_discord` |
+| `drive_links` | Google Drive uploads | `id` (PK), `session_id`, `kind`, `url` |
+
+Child tables reference `sessions(id)` with `ON DELETE CASCADE`.
+
+Each table has a typed repository in [`src/db/repos/`](src/db/repos) — e.g.:
+
+```ts
+import { sessions, captions } from "./db";
+
+const s = sessions.create({ id, guildId, channelId });
+captions.insert({ sessionId: s.id, userId, username, text, tsStart, tsEnd, isFinal: true });
+const finals = captions.listFinal(s.id);
+sessions.end(s.id);
+```
+
+`initDb()` opens the database and logs its location; call it once at startup.
