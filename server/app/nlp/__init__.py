@@ -6,5 +6,6 @@ from app.nlp.ngram import NgramModel
 from app.nlp.normalize import normalize_text
 from app.nlp.parse import parse
 from app.nlp.tokenize import tokenize
+from app.nlp.wordnet_wsd import disambiguate
 
-__all__ = ["tokenize", "normalize_text", "keywords", "parse", "NgramModel"]
+__all__ = ["tokenize", "normalize_text", "keywords", "parse", "NgramModel", "disambiguate"]

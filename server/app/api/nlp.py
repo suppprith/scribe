@@ -10,6 +10,7 @@ from app.nlp.ngram import train as train_ngram
 from app.nlp.normalize import normalize_text
 from app.nlp.parse import parse
 from app.nlp.tokenize import tokenize
+from app.nlp.wordnet_wsd import disambiguate
 
 router = APIRouter(prefix="/nlp", tags=["nlp"])
 
@@ -128,3 +129,24 @@ class SentenceProbability(BaseModel):
 def nlp_sentence_probability(body: SentenceProbIn) -> SentenceProbability:
     model = train_ngram(body.corpus)
     return SentenceProbability(**model.sentence_probability(body.sentence))
+
+
+class Sense(BaseModel):
+    name: str
+    definition: str
+
+
+class AmbiguousWord(BaseModel):
+    word: str
+    num_senses: int
+    senses: list[Sense]
+    chosen_sense: Sense | None
+
+
+class Disambiguation(BaseModel):
+    ambiguous: list[AmbiguousWord]
+
+
+@router.post("/disambiguate", response_model=Disambiguation)
+def nlp_disambiguate(body: TextIn) -> Disambiguation:
+    return Disambiguation(**disambiguate(body.text))

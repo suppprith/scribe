@@ -105,6 +105,7 @@ reused by both an HTTP endpoint (`app/api/nlp.py`) and a standalone demo script
 | Keywords (freq + stopwords + POS) | `POST /nlp/keywords` | `scripts/nlp/keywords_demo.py` | keyword/topic extraction, summaries |
 | Parsing (constituency + dependency) | `POST /nlp/parse` | `scripts/nlp/parse_demo.py` | action-item / imperative detection |
 | N-gram language model | `POST /nlp/predict`, `/nlp/sentence-probability` | `scripts/nlp/ngram_demo.py` | phrase modeling over transcripts |
+| Word-sense disambiguation (Lesk) | `POST /nlp/disambiguate` | `scripts/nlp/wordnet_demo.py` | in-meeting glossary / definitions |
 
 ```bash
 python scripts/nlp/tokenize_demo.py
@@ -112,4 +113,5 @@ python scripts/nlp/normalize_demo.py
 python scripts/nlp/keywords_demo.py
 python scripts/nlp/parse_demo.py
 python scripts/nlp/ngram_demo.py
+python scripts/nlp/wordnet_demo.py
 ```
