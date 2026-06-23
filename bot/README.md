@@ -19,4 +19,21 @@ The Discord bot — the entry point and orchestrator of scribe.
 - Upload audio, transcripts, and summaries to Google Drive
 
 ## Setup
-_To be scaffolded._
+
+From the repo root, install all workspaces once:
+
+```bash
+bun install
+```
+
+Then configure and run the bot:
+
+```bash
+cp bot/.env.example bot/.env   # fill in DISCORD_TOKEN
+bun run --filter @scribe/bot dev     # watch mode
+# or, from this folder:
+cd bot && bun run dev
+```
+
+`bun run start` runs without watch. Without a `DISCORD_TOKEN` the bot logs a
+notice and exits cleanly. Type-check with `bun run typecheck`.
