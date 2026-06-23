@@ -6,6 +6,7 @@ from fastapi import APIRouter
 from pydantic import BaseModel, Field
 
 from app.nlp.keywords import keywords
+from app.nlp.ngram import train as train_ngram
 from app.nlp.normalize import normalize_text
 from app.nlp.parse import parse
 from app.nlp.tokenize import tokenize
@@ -88,3 +89,42 @@ class ParseResult(BaseModel):
 @router.post("/parse", response_model=ParseResult)
 def nlp_parse(body: TextIn) -> ParseResult:
     return ParseResult(**parse(body.text))
+
+
+class PredictIn(BaseModel):
+    corpus: str
+    prefix: str
+    top_n: int = Field(default=5, ge=1, le=50)
+
+
+class Candidate(BaseModel):
+    word: str
+    probability: float
+
+
+class Prediction(BaseModel):
+    candidates: list[Candidate]
+    backoff: str
+
+
+@router.post("/predict", response_model=Prediction)
+def nlp_predict(body: PredictIn) -> Prediction:
+    model = train_ngram(body.corpus)
+    return Prediction(**model.predict_next(body.prefix, body.top_n))
+
+
+class SentenceProbIn(BaseModel):
+    corpus: str
+    sentence: str
+
+
+class SentenceProbability(BaseModel):
+    tokens: list[str]
+    log_prob: float
+    perplexity: float
+
+
+@router.post("/sentence-probability", response_model=SentenceProbability)
+def nlp_sentence_probability(body: SentenceProbIn) -> SentenceProbability:
+    model = train_ngram(body.corpus)
+    return SentenceProbability(**model.sentence_probability(body.sentence))
