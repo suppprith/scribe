@@ -59,3 +59,35 @@ server/app/
 └── pipeline/      # orchestration (transcript → summary)
 scripts/download_models.py   # one-command NLTK + spaCy download
 ```
+
+## ASR (speech-to-text)
+
+faster-whisper on CPU + int8 (CTranslate2). Two endpoints, two model tiers:
+
+| Endpoint | Use | Model (default) |
+|----------|-----|-----------------|
+| `POST /asr/chunk` | Live captions — one short WAV per call | `WHISPER_MODEL_LIVE` (`base`) |
+| `POST /asr/file` | Final accurate pass — full recording | `WHISPER_MODEL_FINAL` (`small`) |
+
+Both take a multipart `file` (16 kHz mono WAV — what the bot produces) and an
+optional `language` form field (an ISO code like `en`/`hi`/`th`, or `auto` to
+detect). The response is `{ text, language, language_probability, duration,
+confidence, segments[], words[] }` with per-word timestamps. Empty, too-short
+(`ASR_MIN_AUDIO_MS`), or near-silent (`ASR_SILENCE_PEAK`) audio short-circuits to
+an empty result without invoking the model. Models lazy-load on first use and
+stay warm.
+
+### Model trade-offs
+
+Defaults are **multilingual** (`base`/`small`) so English, Hindi, and Thai all
+work. The `.en` models (`base.en`, `small.en`) are faster and a touch more
+accurate but **English-only** — use them only for English-only servers.
+
+| Model | Params | ~RAM (int8) | Speed | Accuracy |
+|-------|--------|-------------|-------|----------|
+| `tiny` / `tiny.en` | 39M | ~0.2 GB | fastest | lowest |
+| `base` / `base.en` | 74M | ~0.3 GB | fast | good — live default |
+| `small` / `small.en` | 244M | ~0.7 GB | slower | better — final default |
+
+On the 8 GB host, `base` live + `small` final keeps peak RAM well within budget
+alongside the bot and (later) the MT models.
