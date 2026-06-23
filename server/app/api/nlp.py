@@ -5,6 +5,7 @@ from __future__ import annotations
 from fastapi import APIRouter
 from pydantic import BaseModel, Field
 
+from app.nlp.ir import TfidfIndex, evaluate
 from app.nlp.keywords import keywords
 from app.nlp.ngram import train as train_ngram
 from app.nlp.normalize import normalize_text
@@ -150,3 +151,58 @@ class Disambiguation(BaseModel):
 @router.post("/disambiguate", response_model=Disambiguation)
 def nlp_disambiguate(body: TextIn) -> Disambiguation:
     return Disambiguation(**disambiguate(body.text))
+
+
+class SearchIn(BaseModel):
+    documents: list[str]
+    query: str
+    top_n: int = Field(default=5, ge=1, le=100)
+
+
+class SearchHit(BaseModel):
+    index: int
+    document: str
+    score: float
+
+
+class SearchResult(BaseModel):
+    hits: list[SearchHit]
+
+
+@router.post("/search", response_model=SearchResult)
+def nlp_search(body: SearchIn) -> SearchResult:
+    hits = TfidfIndex(body.documents).search(body.query, body.top_n)
+    return SearchResult(hits=hits)
+
+
+class LabeledQuery(BaseModel):
+    query: str
+    relevant: list[int]
+
+
+class IrMetricsIn(BaseModel):
+    documents: list[str]
+    queries: list[LabeledQuery]
+    top_n: int = Field(default=5, ge=1, le=100)
+
+
+class QueryMetrics(BaseModel):
+    query: str
+    precision: float
+    recall: float
+    f1: float
+    average_precision: float
+
+
+class IrMetricsResult(BaseModel):
+    per_query: list[QueryMetrics]
+    mean_precision: float
+    mean_recall: float
+    mean_f1: float
+    mean_average_precision: float
+
+
+@router.post("/ir-metrics", response_model=IrMetricsResult)
+def nlp_ir_metrics(body: IrMetricsIn) -> IrMetricsResult:
+    queries = [{"query": q.query, "relevant": q.relevant} for q in body.queries]
+    return IrMetricsResult(**evaluate(body.documents, queries, body.top_n))
