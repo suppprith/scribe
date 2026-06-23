@@ -33,7 +33,7 @@ services:
       - path: ./bot/.env
         required: false
     environment:
-      - SERVER_URL=http://server:8000
+      - NLP_SERVICE_URL=http://server:8000
     depends_on:
       - server
     ports:
