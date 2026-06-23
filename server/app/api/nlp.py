@@ -3,8 +3,9 @@
 from __future__ import annotations
 
 from fastapi import APIRouter
-from pydantic import BaseModel
+from pydantic import BaseModel, Field
 
+from app.nlp.keywords import keywords
 from app.nlp.normalize import normalize_text
 from app.nlp.tokenize import tokenize
 
@@ -38,3 +39,28 @@ class NormalizeResult(BaseModel):
 @router.post("/normalize", response_model=NormalizeResult)
 def nlp_normalize(body: TextIn) -> NormalizeResult:
     return NormalizeResult(tokens=normalize_text(body.text))
+
+
+class KeywordsIn(BaseModel):
+    text: str
+    top_n: int = Field(default=10, ge=1, le=100)
+
+
+class KeywordCount(BaseModel):
+    word: str
+    count: int
+
+
+class PosTag(BaseModel):
+    token: str
+    pos: str
+
+
+class KeywordsResult(BaseModel):
+    top_keywords: list[KeywordCount]
+    pos_tags: list[PosTag]
+
+
+@router.post("/keywords", response_model=KeywordsResult)
+def nlp_keywords(body: KeywordsIn) -> KeywordsResult:
+    return KeywordsResult(**keywords(body.text, body.top_n))
