@@ -7,6 +7,7 @@ from pydantic import BaseModel, Field
 
 from app.nlp.keywords import keywords
 from app.nlp.normalize import normalize_text
+from app.nlp.parse import parse
 from app.nlp.tokenize import tokenize
 
 router = APIRouter(prefix="/nlp", tags=["nlp"])
@@ -64,3 +65,26 @@ class KeywordsResult(BaseModel):
 @router.post("/keywords", response_model=KeywordsResult)
 def nlp_keywords(body: KeywordsIn) -> KeywordsResult:
     return KeywordsResult(**keywords(body.text, body.top_n))
+
+
+class Dependency(BaseModel):
+    text: str
+    dep: str
+    head: str
+    pos: str
+
+
+class ActionItem(BaseModel):
+    sentence: str
+    trigger: str
+
+
+class ParseResult(BaseModel):
+    noun_phrases: list[str]
+    dependencies: list[Dependency]
+    action_items: list[ActionItem]
+
+
+@router.post("/parse", response_model=ParseResult)
+def nlp_parse(body: TextIn) -> ParseResult:
+    return ParseResult(**parse(body.text))

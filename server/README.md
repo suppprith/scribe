@@ -103,9 +103,11 @@ reused by both an HTTP endpoint (`app/api/nlp.py`) and a standalone demo script
 | Tokenization | `POST /nlp/tokenize` | `scripts/nlp/tokenize_demo.py` | transcript segmentation |
 | Normalization (stem vs lemma) | `POST /nlp/normalize` | `scripts/nlp/normalize_demo.py` | search / keyword matching |
 | Keywords (freq + stopwords + POS) | `POST /nlp/keywords` | `scripts/nlp/keywords_demo.py` | keyword/topic extraction, summaries |
+| Parsing (constituency + dependency) | `POST /nlp/parse` | `scripts/nlp/parse_demo.py` | action-item / imperative detection |
 
 ```bash
 python scripts/nlp/tokenize_demo.py
 python scripts/nlp/normalize_demo.py
 python scripts/nlp/keywords_demo.py
+python scripts/nlp/parse_demo.py
 ```
