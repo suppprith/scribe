@@ -45,6 +45,21 @@ required variable is missing or invalid, the bot prints a single message listing
 every problem and exits — see [`.env.example`](.env.example) for all variables.
 `DISCORD_TOKEN` is the only hard requirement; the rest have sensible defaults.
 
+## Slash commands
+
+`/scribe` (requires the **Manage Server** permission) configures which voice
+channels are auto-recorded, per guild, persisted to `guild_config`:
+
+| Command | Effect |
+|---------|--------|
+| `/scribe watch <voice-channel>` | Add a voice channel to the auto-record list |
+| `/scribe unwatch <voice-channel>` | Remove a voice channel from the list |
+| `/scribe list` | Show watched channels + the summary channel |
+| `/scribe set-summary-channel <text-channel>` | Set where summaries are posted |
+
+Commands are registered on startup — scoped to `DISCORD_DEV_GUILD_ID` if set
+(instant updates), otherwise globally. Registration needs `DISCORD_CLIENT_ID`.
+
 ## Data layer (SQLite)
 
 The bot owns a local SQLite database (`bun:sqlite`, path `DB_PATH`). It is
