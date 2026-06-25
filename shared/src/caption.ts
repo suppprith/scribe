@@ -1,23 +1,26 @@
 /**
- * A live caption is "partial" while it is still being revised and "final" once
- * the speaker's utterance has settled. The client replaces partials in place and
- * keeps finals.
+ * A live caption for one chunk of one speaker.
+ *
+ * Partials (`isFinal: false`) are a fast, possibly-rough first pass shown
+ * immediately on the client and replaced in place by the corrected
+ * `isFinal: true` version. Only finals are persisted, so a full transcript can
+ * be rebuilt from stored finals alone.
  */
-export type CaptionKind = "partial" | "final";
-
 export interface Caption {
   sessionId: string;
   /** Discord user id of the speaker. */
-  speakerId: string;
-  /** Human-readable speaker label (Discord display name). */
-  speaker: string;
-  kind: CaptionKind;
+  userId: string;
+  /** Display name of the speaker. */
+  username: string;
   /** Transcribed (and, where applicable, translated) text. */
   text: string;
+  /** Offset from session start, in milliseconds. */
+  tsStart: number;
+  tsEnd: number;
+  /** Final (persisted) vs partial (display-only). */
+  isFinal: boolean;
+  /** Per-speaker monotonic sequence number (from chunking) for ordering/dedup. */
+  seq: number;
   /** Detected source language as an ISO 639-1 code, if known (e.g. "en", "hi"). */
   lang?: string;
-  /** Offset from session start, in milliseconds. */
-  offsetMs: number;
-  /** Epoch ms when the caption was produced. */
-  at: number;
 }
