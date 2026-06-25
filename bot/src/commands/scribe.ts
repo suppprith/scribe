@@ -5,7 +5,8 @@ import {
   PermissionFlagsBits,
   SlashCommandBuilder,
 } from "discord.js";
-import { guildConfig } from "../db";
+import { guildConfig, participants, sessions, summaries } from "../db";
+import { buildSummaryEmbed, type SummaryResult } from "../summary";
 import type { Command } from "./types";
 
 const data = new SlashCommandBuilder()
@@ -50,6 +51,20 @@ const data = new SlashCommandBuilder()
           .setDescription("The text channel for summaries.")
           .addChannelTypes(ChannelType.GuildText)
           .setRequired(true),
+      ),
+  )
+  .addSubcommand((sub) =>
+    sub.setName("status").setDescription("Show scribe's active recording sessions."),
+  )
+  .addSubcommand((sub) =>
+    sub
+      .setName("summary")
+      .setDescription("Re-post the summary for a session.")
+      .addStringOption((opt) =>
+        opt
+          .setName("session")
+          .setDescription("Session id (defaults to the most recent ended session).")
+          .setRequired(false),
       ),
   );
 
@@ -129,6 +144,51 @@ async function execute(interaction: ChatInputCommandInteraction): Promise<void> 
         content: `Summaries will be posted to <#${channel.id}>.`,
         ...ephemeral,
       });
+      return;
+    }
+
+    case "status": {
+      const active = sessions.listActive().filter((s) => s.guild_id === guildId);
+      if (active.length === 0) {
+        await interaction.reply({ content: "No active recording sessions.", ...ephemeral });
+        return;
+      }
+      const lines = active.map(
+        (s) => `• <#${s.channel_id}> — started <t:${Math.floor(s.started_at / 1000)}:R>`,
+      );
+      await interaction.reply({
+        content: `**Active sessions (${active.length}):**\n${lines.join("\n")}`,
+        ...ephemeral,
+      });
+      return;
+    }
+
+    case "summary": {
+      const requested = interaction.options.getString("session");
+      const sessionId =
+        requested ?? sessions.listByGuild(guildId).find((s) => s.status === "ended")?.id;
+      if (!sessionId) {
+        await interaction.reply({ content: "No session found to summarize.", ...ephemeral });
+        return;
+      }
+      const stored = summaries.get<SummaryResult>(sessionId);
+      if (!stored) {
+        await interaction.reply({
+          content: `No summary found for session \`${sessionId}\`.`,
+          ...ephemeral,
+        });
+        return;
+      }
+      const names = participants.listBySession(sessionId).map((p) => p.username);
+      const session = sessions.get(sessionId);
+      const durationMs =
+        session?.ended_at != null ? session.ended_at - session.started_at : undefined;
+      const embed = buildSummaryEmbed(stored.structured, {
+        sessionId,
+        participants: names,
+        durationMs,
+      });
+      await interaction.reply({ embeds: [embed] });
       return;
     }
 

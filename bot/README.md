@@ -56,6 +56,8 @@ channels are auto-recorded, per guild, persisted to `guild_config`:
 | `/scribe unwatch <voice-channel>` | Remove a voice channel from the list |
 | `/scribe list` | Show watched channels + the summary channel |
 | `/scribe set-summary-channel <text-channel>` | Set where summaries are posted |
+| `/scribe status` | Show active recording sessions |
+| `/scribe summary [session]` | Re-post a session's summary (defaults to the most recent) |
 
 Commands are registered on startup — scoped to `DISCORD_DEV_GUILD_ID` if set
 (instant updates), otherwise globally. Registration needs `DISCORD_CLIENT_ID`.
@@ -120,6 +122,16 @@ broadcasts the shared `ServerMessage` union (`session_start`, `session_end`,
 only. The latest participant roster is cached per session, so a reconnecting
 client gets the current participants immediately. Rooms are freed when their
 last subscriber disconnects.
+
+## Summaries ([`src/summary/`](src/summary), [`src/transcript/`](src/transcript))
+
+When a session ends, the bot assembles the stored final captions into a
+time-ordered transcript (merged + per-speaker, persisted), POSTs it to the NLP
+service's `/summarize`, and persists the structured result. It then posts a rich
+embed (overview, topics, decisions, action items, participants, duration) to the
+guild's summary channel and broadcasts `summary_ready` to the web. If the NLP
+service fails, a clear notice is posted instead of losing the summary silently.
+`/scribe summary [session]` re-posts a stored summary on demand.
 
 ## Data layer (SQLite)
 
