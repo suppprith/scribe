@@ -97,7 +97,17 @@ longer than ~5s are split at the quietest 20 ms frame between 4–5s, so cuts la
 on natural pauses rather than mid-word. Each piece is encoded as a 16 kHz mono
 WAV (faster-whisper's input format) and tagged with `sessionId`, `userId`,
 `username`, a per-speaker `seq`, and interpolated `tsStart`/`tsEnd`. Chunks are
-pushed to a `ChunkQueue` — an async FIFO the Phase 3 transcription loop drains.
+pushed to a `ChunkQueue` — a bounded async FIFO the transcription loop drains.
+
+### Transcription loop ([`src/transcription/`](src/transcription))
+
+`TranscriptionWorker` drains the chunk queue and, for each chunk, POSTs the WAV
+to the NLP service's `/asr/chunk`. Non-empty results become **final** captions:
+persisted to the `captions` table and broadcast over the WebSocket, attributed
+to the right speaker. A bounded queue (drop-oldest) plus a concurrency limit
+keep the single shared CPU from being overwhelmed when several people speak at
+once, and per-speaker word-level stitching removes duplicate/overlapping text
+across consecutive chunks.
 
 ## Live captions (WebSocket)
 

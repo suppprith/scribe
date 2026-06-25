@@ -1,9 +1,10 @@
 import { Client, Events, GatewayIntentBits } from "discord.js";
 import { AudioChunker, ChunkQueue } from "./audio";
 import { config } from "./config";
-import { initDb } from "./db";
+import { captions, initDb } from "./db";
 import { handleInteraction } from "./discord/interactions";
 import { registerCommands } from "./discord/registerCommands";
+import { TranscriptionWorker, transcribeChunk } from "./transcription";
 import { SessionManager, createDiscordVoiceGateway, createVoiceStateHandler } from "./voice";
 import { startCaptionServer } from "./ws";
 
@@ -21,18 +22,29 @@ const client = new Client({
   intents: [GatewayIntentBits.Guilds, GatewayIntentBits.GuildVoiceStates],
 });
 
-// Captured utterances → silence-aware WAV chunks → queue for the Phase 3
-// transcription loop.
-const chunkQueue = new ChunkQueue();
-const chunker = new AudioChunker({
-  onChunk: (chunk) => {
-    chunkQueue.enqueue(chunk);
-    console.log(
-      `[scribe] queued chunk ${chunk.userId}#${chunk.seq} (${chunk.wav.length}B WAV) ` +
-        `from ${chunk.username} in session ${chunk.sessionId}`,
-    );
+// Captured utterances → silence-aware WAV chunks → bounded queue → transcription
+// worker → ASR → persisted caption + live broadcast.
+const chunkQueue = new ChunkQueue(64);
+const chunker = new AudioChunker({ onChunk: (chunk) => chunkQueue.enqueue(chunk) });
+
+const transcriptionWorker = new TranscriptionWorker({
+  queue: chunkQueue,
+  transcribe: (wav, language) => transcribeChunk(config.nlpServiceUrl, wav, { language }),
+  onCaption: (caption) => {
+    // Only finals are persisted; the live broadcast carries the same caption.
+    captions.insert({
+      sessionId: caption.sessionId,
+      userId: caption.userId,
+      username: caption.username,
+      text: caption.text,
+      tsStart: caption.tsStart,
+      tsEnd: caption.tsEnd,
+      isFinal: caption.isFinal,
+    });
+    captionServer.broadcast({ type: "caption", caption });
   },
 });
+transcriptionWorker.start();
 
 const sessionManager = new SessionManager({
   gateway: createDiscordVoiceGateway({
@@ -58,6 +70,7 @@ client.on(Events.VoiceStateUpdate, createVoiceStateHandler(sessionManager));
 const shutdown = async (signal: NodeJS.Signals) => {
   console.log(`[scribe] ${signal} received — shutting down`);
   try {
+    transcriptionWorker.stop();
     sessionManager.endAll();
     captionServer.stop();
     await client.destroy();
