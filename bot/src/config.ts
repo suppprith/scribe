@@ -25,6 +25,8 @@ export interface BotConfig {
   nlpServiceUrl: string;
   /** Port for the WebSocket server that streams live captions to the client. */
   wsPort: number;
+  /** Optional shared token clients must present to connect to the WebSocket. */
+  wsAuthToken?: string;
   /** Port for the HTTP API the client reads sessions/transcripts from. */
   httpPort: number;
   /** Path to the SQLite database file. */
@@ -81,6 +83,7 @@ export function loadConfig(env: Env = process.env): BotConfig {
     discordDevGuildId: optional("DISCORD_DEV_GUILD_ID"),
     nlpServiceUrl: optional("NLP_SERVICE_URL") ?? "http://localhost:8000",
     wsPort: port("WS_PORT", 8080),
+    wsAuthToken: optional("WS_AUTH_TOKEN"),
     httpPort: port("HTTP_PORT", 8081),
     dbPath: optional("DB_PATH") ?? "./data/scribe.db",
     googleDrive: {

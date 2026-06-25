@@ -5,9 +5,17 @@ import { initDb } from "./db";
 import { handleInteraction } from "./discord/interactions";
 import { registerCommands } from "./discord/registerCommands";
 import { SessionManager, createDiscordVoiceGateway, createVoiceStateHandler } from "./voice";
+import { startCaptionServer } from "./ws";
 
 // Config is validated on import; bring up the data layer before Discord.
 initDb();
+
+// Realtime transport for live captions to the web client.
+const captionServer = startCaptionServer({
+  port: config.wsPort,
+  authToken: config.wsAuthToken,
+});
+console.log(`[scribe] WebSocket server listening on :${captionServer.port}`);
 
 const client = new Client({
   intents: [GatewayIntentBits.Guilds, GatewayIntentBits.GuildVoiceStates],
@@ -32,6 +40,7 @@ const sessionManager = new SessionManager({
     onSegment: (segment) => chunker.push(segment),
   }),
   onSessionEnd: (info) => {
+    captionServer.broadcast({ type: "session_end", sessionId: info.sessionId });
     // Phase 5/6: assemble transcript → summarize → deliver to Discord → archive.
     console.log(`[scribe] session ${info.sessionId} ready for the end-of-session pipeline`);
   },
@@ -50,6 +59,7 @@ const shutdown = async (signal: NodeJS.Signals) => {
   console.log(`[scribe] ${signal} received — shutting down`);
   try {
     sessionManager.endAll();
+    captionServer.stop();
     await client.destroy();
   } finally {
     process.exit(0);

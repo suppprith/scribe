@@ -99,6 +99,18 @@ WAV (faster-whisper's input format) and tagged with `sessionId`, `userId`,
 `username`, a per-speaker `seq`, and interpolated `tsStart`/`tsEnd`. Chunks are
 pushed to a `ChunkQueue` — an async FIFO the Phase 3 transcription loop drains.
 
+## Live captions (WebSocket)
+
+[`src/ws/`](src/ws) hosts a `Bun.serve` WebSocket server (`WS_PORT`) that pushes
+realtime events to the web client. Clients connect to `/ws?session=<id>` (and
+`&token=<WS_AUTH_TOKEN>` if configured) and join that session's room; they can
+also resubscribe with a `{ type: "subscribe", sessionId }` message. The server
+broadcasts the shared `ServerMessage` union (`session_start`, `session_end`,
+`participant_update`, `caption`, `summary_ready`) to a session's subscribers
+only. The latest participant roster is cached per session, so a reconnecting
+client gets the current participants immediately. Rooms are freed when their
+last subscriber disconnects.
+
 ## Data layer (SQLite)
 
 The bot owns a local SQLite database (`bun:sqlite`, path `DB_PATH`). It is
