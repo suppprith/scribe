@@ -4,6 +4,7 @@ import { config } from "./config";
 import { captions, initDb } from "./db";
 import { handleInteraction } from "./discord/interactions";
 import { registerCommands } from "./discord/registerCommands";
+import { assembleTranscript } from "./transcript";
 import { TranscriptionWorker, transcribeChunk } from "./transcription";
 import { SessionManager, createDiscordVoiceGateway, createVoiceStateHandler } from "./voice";
 import { startCaptionServer } from "./ws";
@@ -53,8 +54,12 @@ const sessionManager = new SessionManager({
   }),
   onSessionEnd: (info) => {
     captionServer.broadcast({ type: "session_end", sessionId: info.sessionId });
-    // Phase 5/6: assemble transcript → summarize → deliver to Discord → archive.
-    console.log(`[scribe] session ${info.sessionId} ready for the end-of-session pipeline`);
+    const transcript = assembleTranscript(info.sessionId);
+    // Phase 5/6: summarize → deliver to Discord → archive.
+    console.log(
+      `[scribe] assembled transcript for ${info.sessionId} ` +
+        `(${transcript.utterances.length} utterances, ${transcript.participants.length} speakers)`,
+    );
   },
 });
 
