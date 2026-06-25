@@ -5,6 +5,7 @@ from __future__ import annotations
 from fastapi import APIRouter
 from pydantic import BaseModel, Field
 
+from app.nlp.embeddings import most_similar, vectors_for
 from app.nlp.ir import TfidfIndex, evaluate
 from app.nlp.keywords import keywords
 from app.nlp.ngram import train as train_ngram
@@ -232,3 +233,59 @@ class NlgResult(BaseModel):
 @router.post("/nlg", response_model=NlgResult)
 def nlp_nlg(body: NlgIn) -> NlgResult:
     return NlgResult(**generate_summary(body.model_dump(exclude_none=True)))
+
+
+class EmbeddingsIn(BaseModel):
+    documents: list[str]
+    words: list[str] = []
+    vector_size: int = Field(default=50, ge=8, le=300)
+    sg: int = Field(default=0, ge=0, le=1)  # 0 = CBOW, 1 = skip-gram
+    min_count: int = Field(default=1, ge=1, le=50)
+
+
+class EmbeddingsResult(BaseModel):
+    vectors: dict[str, list[float]]
+
+
+@router.post("/embeddings", response_model=EmbeddingsResult)
+def nlp_embeddings(body: EmbeddingsIn) -> EmbeddingsResult:
+    vectors = vectors_for(
+        body.documents,
+        body.words or None,
+        vector_size=body.vector_size,
+        sg=body.sg,
+        min_count=body.min_count,
+    )
+    return EmbeddingsResult(vectors=vectors)
+
+
+class SimilarIn(BaseModel):
+    documents: list[str]
+    word: str
+    top_n: int = Field(default=10, ge=1, le=50)
+    vector_size: int = Field(default=50, ge=8, le=300)
+    sg: int = Field(default=0, ge=0, le=1)
+    min_count: int = Field(default=1, ge=1, le=50)
+
+
+class SimilarWord(BaseModel):
+    word: str
+    score: float
+
+
+class SimilarResult(BaseModel):
+    word: str
+    similar: list[SimilarWord]
+
+
+@router.post("/similar", response_model=SimilarResult)
+def nlp_similar(body: SimilarIn) -> SimilarResult:
+    similar = most_similar(
+        body.documents,
+        body.word,
+        body.top_n,
+        vector_size=body.vector_size,
+        sg=body.sg,
+        min_count=body.min_count,
+    )
+    return SimilarResult(word=body.word, similar=similar)

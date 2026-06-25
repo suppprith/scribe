@@ -21,6 +21,7 @@ NLTK_PACKAGES = [
     "stopwords",
     "averaged_perceptron_tagger",
     "averaged_perceptron_tagger_eng",
+    "brown",  # sample training corpus for the Word2Vec demo
 ]
 
 SPACY_MODEL = "en_core_web_sm"

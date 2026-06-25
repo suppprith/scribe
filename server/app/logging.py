@@ -25,6 +25,9 @@ def configure_logging(level: int = logging.INFO) -> None:
     for name in ("uvicorn", "uvicorn.error", "uvicorn.access"):
         logging.getLogger(name).handlers.clear()
         logging.getLogger(name).propagate = True
+    # Quiet chatty third-party training/IO loggers.
+    for name in ("gensim", "gensim.models.word2vec", "gensim.utils"):
+        logging.getLogger(name).setLevel(logging.WARNING)
     _configured = True
 
 

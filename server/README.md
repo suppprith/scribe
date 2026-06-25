@@ -108,6 +108,7 @@ reused by both an HTTP endpoint (`app/api/nlp.py`) and a standalone demo script
 | Word-sense disambiguation (Lesk) | `POST /nlp/disambiguate` | `scripts/nlp/wordnet_demo.py` | in-meeting glossary / definitions |
 | IR search (TF-IDF + P/R/F/MAP) | `POST /nlp/search`, `/nlp/ir-metrics` | `scripts/nlp/ir_demo.py` | transcript search + extractive ranking |
 | Template NLG summarizer | `POST /nlp/nlg` | `scripts/nlp/nlg_demo.py` | meeting summaries (no external LLM) |
+| Word2Vec embeddings | `POST /nlp/embeddings`, `/nlp/similar` | `scripts/nlp/word2vec_demo.py` | semantic search / clustering |
 
 ### Summarization pipeline
 
