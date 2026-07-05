@@ -9,6 +9,9 @@ export interface CaptionRow {
   ts_start: number; // ms from session start
   ts_end: number;
   is_final: number; // 0 partial, 1 final
+  lang: string | null; // detected source language (ISO 639-1)
+  translated_text: string | null; // English translation of non-English turns
+  translated_to: string | null; // target language of translated_text
 }
 
 export const captions = {
@@ -20,10 +23,14 @@ export const captions = {
     tsStart: number;
     tsEnd: number;
     isFinal?: boolean;
+    lang?: string;
+    translatedText?: string;
+    translatedTo?: string;
   }): CaptionRow {
     return q<CaptionRow>(
-      `INSERT INTO captions (session_id, user_id, username, text, ts_start, ts_end, is_final)
-       VALUES (?, ?, ?, ?, ?, ?, ?)
+      `INSERT INTO captions
+         (session_id, user_id, username, text, ts_start, ts_end, is_final, lang, translated_text, translated_to)
+       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
        RETURNING *`,
     ).get(
       input.sessionId,
@@ -33,7 +40,19 @@ export const captions = {
       input.tsStart,
       input.tsEnd,
       input.isFinal ? 1 : 0,
+      input.lang ?? null,
+      input.translatedText ?? null,
+      input.translatedTo ?? null,
     )!;
+  },
+
+  /** Attach (or replace) the English translation of a stored caption. */
+  setTranslation(id: number, translatedText: string, translatedTo: string): void {
+    q(`UPDATE captions SET translated_text = ?, translated_to = ? WHERE id = ?`).run(
+      translatedText,
+      translatedTo,
+      id,
+    );
   },
 
   listBySession(sessionId: string): CaptionRow[] {

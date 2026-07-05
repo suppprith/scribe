@@ -45,14 +45,17 @@ CREATE TABLE IF NOT EXISTS participants (
 );
 
 CREATE TABLE IF NOT EXISTS captions (
-  id         INTEGER PRIMARY KEY AUTOINCREMENT,
-  session_id TEXT NOT NULL REFERENCES sessions (id) ON DELETE CASCADE,
-  user_id    TEXT NOT NULL,
-  username   TEXT NOT NULL,
-  text       TEXT NOT NULL,
-  ts_start   INTEGER NOT NULL,                      -- ms from session start
-  ts_end     INTEGER NOT NULL,
-  is_final   INTEGER NOT NULL DEFAULT 0             -- 0 partial, 1 final
+  id             INTEGER PRIMARY KEY AUTOINCREMENT,
+  session_id     TEXT NOT NULL REFERENCES sessions (id) ON DELETE CASCADE,
+  user_id        TEXT NOT NULL,
+  username       TEXT NOT NULL,
+  text           TEXT NOT NULL,
+  ts_start       INTEGER NOT NULL,                  -- ms from session start
+  ts_end         INTEGER NOT NULL,
+  is_final       INTEGER NOT NULL DEFAULT 0,        -- 0 partial, 1 final
+  lang           TEXT,                              -- detected source language (ISO 639-1)
+  translated_text TEXT,                             -- English translation (non-English turns)
+  translated_to  TEXT                               -- target of translated_text (e.g. 'en')
 );
 CREATE INDEX IF NOT EXISTS idx_captions_session ON captions (session_id);
 
@@ -77,7 +80,23 @@ CREATE TABLE IF NOT EXISTS drive_links (
 CREATE INDEX IF NOT EXISTS idx_drive_links_session ON drive_links (session_id);
 `;
 
+/**
+ * Add a column to a table when it's missing. SQLite has no
+ * `ADD COLUMN IF NOT EXISTS`, so we check `PRAGMA table_info` first. Idempotent —
+ * lets an existing database gain columns added after its table first shipped.
+ */
+function addColumnIfMissing(db: Database, table: string, column: string, ddl: string): void {
+  const cols = db.query(`PRAGMA table_info(${table})`).all() as { name: string }[];
+  if (!cols.some((c) => c.name === column)) {
+    db.exec(`ALTER TABLE ${table} ADD COLUMN ${ddl}`);
+  }
+}
+
 /** Apply the schema. Idempotent — safe to call on every boot. */
 export function migrate(db: Database): void {
   db.exec(SCHEMA_SQL);
+  // Translation columns added to captions in Phase 7 (backfill existing DBs).
+  addColumnIfMissing(db, "captions", "lang", "lang TEXT");
+  addColumnIfMissing(db, "captions", "translated_text", "translated_text TEXT");
+  addColumnIfMissing(db, "captions", "translated_to", "translated_to TEXT");
 }

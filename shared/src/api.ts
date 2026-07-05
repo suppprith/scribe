@@ -30,6 +30,10 @@ export interface TranscriptLine {
   /** Offset from session start, in ms. */
   tsStart: number;
   tsEnd: number;
+  /** Detected source language (ISO 639-1), if known. */
+  lang?: string;
+  /** English translation of `text`, present when `lang` is non-English. */
+  translatedText?: string;
 }
 
 export interface SessionTranscript {

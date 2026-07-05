@@ -5,7 +5,7 @@ import { captions, initDb, sessions, userLanguage } from "./db";
 import { handleInteraction } from "./discord/interactions";
 import { registerCommands } from "./discord/registerCommands";
 import { deliverSummary } from "./summary";
-import { TranscriptionWorker, transcribeChunk } from "./transcription";
+import { TranscriptionWorker, createTranslator, transcribeChunk } from "./transcription";
 import { SessionManager, createDiscordVoiceGateway, createVoiceStateHandler } from "./voice";
 import { startCaptionServer } from "./ws";
 import { startHttpServer } from "./http";
@@ -33,6 +33,9 @@ const client = new Client({
 const chunkQueue = new ChunkQueue(64);
 const chunker = new AudioChunker({ onChunk: (chunk) => chunkQueue.enqueue(chunk) });
 
+// Cached translator over the NLP service: Hindi/Thai turns → English.
+const translator = createTranslator(config.nlpServiceUrl);
+
 const transcriptionWorker = new TranscriptionWorker({
   queue: chunkQueue,
   transcribe: (wav, language) => transcribeChunk(config.nlpServiceUrl, wav, { language }),
@@ -45,8 +48,14 @@ const transcriptionWorker = new TranscriptionWorker({
     const lang = userLanguage.get(session.guild_id, chunk.userId);
     return lang === "auto" ? undefined : lang;
   },
+  // Attach an English translation to non-English finals (src → en).
+  translate: async (text, srcLang) => {
+    const r = await translator(text, srcLang, "en");
+    return r ? { text: r.translatedText, to: r.tgt } : null;
+  },
   onCaption: (caption) => {
-    // Only finals are persisted; the live broadcast carries the same caption.
+    // Only finals are persisted; the live broadcast carries the same caption
+    // (original text + any English translation).
     captions.insert({
       sessionId: caption.sessionId,
       userId: caption.userId,
@@ -55,6 +64,9 @@ const transcriptionWorker = new TranscriptionWorker({
       tsStart: caption.tsStart,
       tsEnd: caption.tsEnd,
       isFinal: caption.isFinal,
+      lang: caption.lang,
+      translatedText: caption.translatedText,
+      translatedTo: caption.translatedTo,
     });
     captionServer.broadcast({ type: "caption", caption });
   },

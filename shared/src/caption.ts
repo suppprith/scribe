@@ -23,4 +23,8 @@ export interface Caption {
   seq: number;
   /** Detected source language as an ISO 639-1 code, if known (e.g. "en", "hi"). */
   lang?: string;
+  /** English translation of `text`, present only when `lang` is non-English. */
+  translatedText?: string;
+  /** Target language of `translatedText` (currently always "en"). */
+  translatedTo?: string;
 }

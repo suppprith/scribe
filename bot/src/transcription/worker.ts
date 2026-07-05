@@ -12,6 +12,12 @@ export interface TranscriptionWorkerOptions {
    * chunk so a mid-session `/scribe lang` change takes effect immediately.
    */
   resolveLanguage?: (chunk: AudioChunk) => string | undefined;
+  /**
+   * Translate a non-English caption to English. Called only for finals whose
+   * detected language isn't English; returns `null` (kept original-only) on any
+   * failure. `to` is the target language of the returned text.
+   */
+  translate?: (text: string, srcLang: string) => Promise<{ text: string; to: string } | null>;
   /** Emit a finished caption (persist + broadcast). */
   onCaption: (caption: Caption) => void;
   /** Max chunks transcribed in parallel. Default 1 (single shared CPU). */
@@ -80,6 +86,19 @@ export class TranscriptionWorker {
     this.lastText.set(key, text);
     if (!stitched) return; // duplicate of the previous chunk
 
+    // Non-English turns get an English translation attached alongside the
+    // original; failures leave the caption original-only.
+    let translatedText: string | undefined;
+    let translatedTo: string | undefined;
+    const lang = result.language;
+    if (this.options.translate && lang && lang !== "en") {
+      const t = await this.options.translate(stitched, lang);
+      if (t && t.text && t.text !== stitched) {
+        translatedText = t.text;
+        translatedTo = t.to;
+      }
+    }
+
     this.options.onCaption({
       sessionId: chunk.sessionId,
       userId: chunk.userId,
@@ -90,6 +109,8 @@ export class TranscriptionWorker {
       isFinal: true,
       seq: chunk.seq,
       lang: result.language,
+      translatedText,
+      translatedTo,
     });
   }
 }

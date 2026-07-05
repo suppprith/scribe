@@ -1,7 +1,8 @@
 import type { ServerMessage } from "@scribe/shared";
 import type { Client } from "discord.js";
 import { guildConfig, sessions, summaries } from "../db";
-import { assembleTranscript } from "../transcript";
+import { assembleTranscript, backfillTranslations } from "../transcript";
+import { createTranslator } from "../transcription";
 import { summarizeTranscript } from "./client";
 import { buildSummaryEmbed } from "./embed";
 
@@ -20,6 +21,14 @@ export interface DeliverDeps {
 export async function deliverSummary(deps: DeliverDeps, sessionId: string): Promise<void> {
   const session = sessions.get(sessionId);
   if (!session) return;
+
+  // Ensure every non-English turn has an English translation before assembling,
+  // so the summary (built from the English text) is coherent for mixed meetings.
+  const translator = createTranslator(deps.nlpServiceUrl);
+  await backfillTranslations(sessionId, async (text, src) => {
+    const r = await translator(text, src, "en");
+    return r ? { text: r.translatedText, to: r.tgt } : null;
+  });
 
   const transcript = assembleTranscript(sessionId);
   const channelId = guildConfig.get(session.guild_id)?.summaryChannelId ?? undefined;

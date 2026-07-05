@@ -56,6 +56,8 @@ export function toSessionTranscript(sessionId: string): SessionTranscript {
     text: c.text,
     tsStart: c.ts_start,
     tsEnd: c.ts_end,
+    lang: c.lang ?? undefined,
+    translatedText: c.translated_text ?? undefined,
   }));
 
   const perUser: Record<string, string> = {};
