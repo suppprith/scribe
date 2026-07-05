@@ -38,6 +38,30 @@ async function get<T>(path: string, init?: RequestInit): Promise<T> {
   return (text ? JSON.parse(text) : undefined) as T;
 }
 
+async function post<T>(path: string, body: unknown): Promise<T> {
+  let res: Response;
+  try {
+    res = await fetch(`${API_URL}${path}`, {
+      method: "POST",
+      cache: "no-store",
+      headers: { "Content-Type": "application/json", Accept: "application/json" },
+      body: JSON.stringify(body),
+    });
+  } catch {
+    throw new ApiError(`Cannot reach bot API at ${API_URL}`);
+  }
+  if (!res.ok) throw new ApiError(`POST ${path} failed (${res.status})`, res.status);
+  const text = await res.text();
+  return (text ? JSON.parse(text) : undefined) as T;
+}
+
+/** Result of the on-demand translation endpoint. */
+export interface TranslationResult {
+  translatedText: string;
+  src: string;
+  tgt: string;
+}
+
 export const api = {
   /** True when the bot API answers `/health`. Never throws. */
   async health(): Promise<boolean> {
@@ -78,5 +102,10 @@ export const api = {
   search(id: string, query: string, mode: SearchMode): Promise<SearchResponse> {
     const qs = new URLSearchParams({ q: query, mode });
     return get<SearchResponse>(`/api/sessions/${encodeURIComponent(id)}/search?${qs}`);
+  },
+
+  /** On-demand translate a snippet to English (src → tgt, tgt defaults to en). */
+  translate(text: string, src: string, tgt = "en"): Promise<TranslationResult> {
+    return post<TranslationResult>("/api/translate", { text, src, tgt });
   },
 };

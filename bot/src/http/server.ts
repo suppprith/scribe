@@ -1,11 +1,12 @@
 import type { MeetingSummary, SearchMode } from "@scribe/shared";
 import { sessions, summaries } from "../db";
+import { createTranslator } from "../transcription";
 import { toSessionDetail, toSessionListItem, toSessionTranscript } from "./mappers";
 import { searchTranscript } from "./search";
 
 const CORS_HEADERS: Record<string, string> = {
   "Access-Control-Allow-Origin": "*",
-  "Access-Control-Allow-Methods": "GET, OPTIONS",
+  "Access-Control-Allow-Methods": "GET, POST, OPTIONS",
   "Access-Control-Allow-Headers": "Content-Type, Accept",
 };
 
@@ -36,8 +37,12 @@ export interface HttpServer {
  *   GET /api/sessions/:id/transcript      → SessionTranscript
  *   GET /api/sessions/:id/summary         → MeetingSummary (404 if not generated)
  *   GET /api/sessions/:id/search?q=&mode= → SearchResponse (keyword | semantic)
+ *   POST /api/translate { text, src, tgt? }  → { translatedText, src, tgt }
  */
 export function startHttpServer(opts: { port: number; nlpServiceUrl: string }): HttpServer {
+  // Cached translator for the on-demand UI endpoint (dedupes repeat requests).
+  const translator = createTranslator(opts.nlpServiceUrl);
+
   const server = Bun.serve({
     port: opts.port,
     async fetch(req) {
@@ -45,6 +50,22 @@ export function startHttpServer(opts: { port: number; nlpServiceUrl: string }): 
 
       const url = new URL(req.url);
       const path = url.pathname.replace(/\/+$/, "") || "/";
+
+      // On-demand translation for the web UI (Original ⇄ English toggle).
+      if (req.method === "POST" && path === "/api/translate") {
+        let body: { text?: unknown; src?: unknown; tgt?: unknown };
+        try {
+          body = (await req.json()) as { text?: unknown; src?: unknown; tgt?: unknown };
+        } catch {
+          return json({ error: "invalid JSON body" }, 400);
+        }
+        const text = typeof body.text === "string" ? body.text : "";
+        const src = typeof body.src === "string" ? body.src : "";
+        const tgt = typeof body.tgt === "string" && body.tgt ? body.tgt : "en";
+        if (!text || !src) return json({ error: "text and src are required" }, 400);
+        const result = await translator(text, src, tgt);
+        return result ? json(result) : json({ error: "translation unavailable" }, 502);
+      }
 
       if (req.method !== "GET") return json({ error: "method not allowed" }, 405);
       if (path === "/health") return new Response("ok", { headers: CORS_HEADERS });

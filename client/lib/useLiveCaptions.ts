@@ -70,6 +70,8 @@ export function useLiveCaptions(sessionId: string): LiveCaptions {
             isFinal: true,
             // Persisted finals have no stored seq; derive a stable, ordered key.
             seq: line.tsStart,
+            lang: line.lang,
+            translatedText: line.translatedText,
           };
           captionMap.current.set(keyOf(c), c);
         }

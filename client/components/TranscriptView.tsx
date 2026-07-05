@@ -3,16 +3,27 @@
 import clsx from "clsx";
 import { useEffect, useState } from "react";
 import type { Participant, TranscriptLine } from "@scribe/shared";
+import { LanguageBadge } from "@/components/LanguageBadge";
 import { SpeakerAvatar } from "@/components/SpeakerAvatar";
+import { TranslatedText } from "@/components/TranslatedText";
+import { TranslationControls } from "@/components/TranslationControls";
 import { formatClock } from "@/lib/format";
+import { isTranslatable } from "@/lib/lang";
 import { speakerColor } from "@/lib/speaker";
+import { useTranslations } from "@/lib/useTranslations";
 
 type Mode = "merged" | "by-speaker";
+
+/** A caption's source language, only when it's a non-English (badge-worthy) one. */
+function badgeLang(lang?: string): string | undefined {
+  return lang && lang !== "en" ? lang : undefined;
+}
 
 /**
  * The attributed transcript. "Merged" shows time-ordered lines (each anchored
  * as `#line-N` so search results can deep-link to it); "By speaker" groups all
- * of each participant's text together.
+ * of each participant's text together. A translation toggle (Original / English
+ * / Both) appears when any turn is in a non-English language.
  */
 export function TranscriptView({
   lines,
@@ -23,6 +34,21 @@ export function TranscriptView({
 }) {
   const [mode, setMode] = useState<Mode>("merged");
   const [highlight, setHighlight] = useState<number | null>(null);
+  const t = useTranslations();
+
+  const hasTranslatable = lines.some((l) => isTranslatable(l.lang));
+
+  // English of a line: the bot-provided translation, else the on-demand cache.
+  const englishOf = (line: TranscriptLine): string | undefined =>
+    line.translatedText ?? t.get(line.text);
+
+  // When showing English, fetch any translatable line the bot didn't translate.
+  useEffect(() => {
+    if (t.mode === "original") return;
+    for (const line of lines) {
+      if (!line.translatedText && isTranslatable(line.lang)) t.ensure(line.text, line.lang);
+    }
+  }, [t.mode, lines, t]);
 
   // Deep-link support: on load / hash change, scroll to and flash `#line-N`.
   useEffect(() => {
@@ -51,13 +77,16 @@ export function TranscriptView({
 
   return (
     <div className="space-y-4">
-      <div className="inline-flex rounded-lg border border-border bg-surface p-0.5 text-sm">
-        <ModeButton active={mode === "merged"} onClick={() => setMode("merged")}>
-          Merged
-        </ModeButton>
-        <ModeButton active={mode === "by-speaker"} onClick={() => setMode("by-speaker")}>
-          By speaker
-        </ModeButton>
+      <div className="flex flex-wrap items-center justify-between gap-2">
+        <div className="inline-flex rounded-lg border border-border bg-surface p-0.5 text-sm">
+          <ModeButton active={mode === "merged"} onClick={() => setMode("merged")}>
+            Merged
+          </ModeButton>
+          <ModeButton active={mode === "by-speaker"} onClick={() => setMode("by-speaker")}>
+            By speaker
+          </ModeButton>
+        </div>
+        {hasTranslatable && <TranslationControls mode={t.mode} onChange={t.setMode} />}
       </div>
 
       {mode === "merged" ? (
@@ -78,37 +107,49 @@ export function TranscriptView({
                     {line.username}
                   </span>
                   <span className="font-mono text-xs text-muted">{formatClock(line.tsStart)}</span>
+                  <LanguageBadge code={badgeLang(line.lang)} />
                 </div>
-                <p className="text-fg/90">{line.text}</p>
+                <p className="text-fg/90">
+                  <TranslatedText text={line.text} english={englishOf(line)} mode={t.mode} />
+                </p>
               </div>
             </li>
           ))}
         </ol>
       ) : (
-        <BySpeaker lines={lines} />
+        <BySpeaker lines={lines} mode={t.mode} englishOf={englishOf} />
       )}
     </div>
   );
 }
 
-function BySpeaker({ lines }: { lines: TranscriptLine[] }) {
+function BySpeaker({
+  lines,
+  mode,
+  englishOf,
+}: {
+  lines: TranscriptLine[];
+  mode: ReturnType<typeof useTranslations>["mode"];
+  englishOf: (line: TranscriptLine) => string | undefined;
+}) {
   // Group each speaker's utterances, preserving the order they first appear.
   const order: string[] = [];
-  const byUser = new Map<string, { name: string; text: string[] }>();
+  const byUser = new Map<string, { name: string; lines: TranscriptLine[] }>();
   for (const line of lines) {
     let entry = byUser.get(line.userId);
     if (!entry) {
-      entry = { name: line.username, text: [] };
+      entry = { name: line.username, lines: [] };
       byUser.set(line.userId, entry);
       order.push(line.userId);
     }
-    entry.text.push(line.text);
+    entry.lines.push(line);
   }
 
   return (
     <div className="space-y-5">
       {order.map((userId) => {
         const entry = byUser.get(userId)!;
+        const lang = badgeLang(entry.lines.find((l) => badgeLang(l.lang))?.lang);
         return (
           <section key={userId} className="rounded-xl border border-border bg-surface p-4">
             <div className="mb-2 flex items-center gap-2">
@@ -116,8 +157,21 @@ function BySpeaker({ lines }: { lines: TranscriptLine[] }) {
               <span className="font-medium" style={{ color: speakerColor(userId) }}>
                 {entry.name}
               </span>
+              <LanguageBadge code={lang} />
             </div>
-            <p className="text-fg/90">{entry.text.join(" ")}</p>
+            {mode === "both" ? (
+              <div className="space-y-2 text-fg/90">
+                {entry.lines.map((line, i) => (
+                  <p key={i}>
+                    <TranslatedText text={line.text} english={englishOf(line)} mode="both" />
+                  </p>
+                ))}
+              </div>
+            ) : (
+              <p className="text-fg/90">
+                {entry.lines.map((line) => (mode === "english" ? englishOf(line) ?? line.text : line.text)).join(" ")}
+              </p>
+            )}
           </section>
         );
       })}
