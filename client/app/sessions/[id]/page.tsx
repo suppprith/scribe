@@ -4,6 +4,7 @@ import Link from "next/link";
 import { useParams } from "next/navigation";
 import { useEffect, useState } from "react";
 import type { DriveLink, SessionDetail } from "@scribe/shared";
+import { LanguageBadge } from "@/components/LanguageBadge";
 import { SpeakerAvatar } from "@/components/SpeakerAvatar";
 import { TranscriptView } from "@/components/TranscriptView";
 import { api } from "@/lib/api";
@@ -74,6 +75,7 @@ export default function SessionDetailPage() {
               <span key={p.id} className="inline-flex items-center gap-1.5">
                 <SpeakerAvatar userId={p.id} name={p.name} size={22} />
                 {p.name}
+                <LanguageBadge code={p.lang} />
               </span>
             ))}
           </span>

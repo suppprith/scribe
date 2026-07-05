@@ -6,6 +6,12 @@ export interface TranscriptionWorkerOptions {
   queue: ChunkQueue<AudioChunk>;
   /** Transcribe a WAV chunk (the NLP service call). */
   transcribe: (wav: Buffer, language?: string) => Promise<AsrChunkResult>;
+  /**
+   * Resolve the ASR language hint for a chunk (the speaker's configured
+   * language). Return `undefined`/`"auto"` to let Whisper detect. Looked up per
+   * chunk so a mid-session `/scribe lang` change takes effect immediately.
+   */
+  resolveLanguage?: (chunk: AudioChunk) => string | undefined;
   /** Emit a finished caption (persist + broadcast). */
   onCaption: (caption: Caption) => void;
   /** Max chunks transcribed in parallel. Default 1 (single shared CPU). */
@@ -64,7 +70,8 @@ export class TranscriptionWorker {
   }
 
   private async handle(chunk: AudioChunk): Promise<void> {
-    const result = await this.options.transcribe(chunk.wav);
+    const language = this.options.resolveLanguage?.(chunk);
+    const result = await this.options.transcribe(chunk.wav, language);
     const text = result.text.trim();
     if (!text) return;
 

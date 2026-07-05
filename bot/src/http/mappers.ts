@@ -11,22 +11,27 @@ import {
   driveLinks,
   participants,
   summaries,
+  userLanguage,
   type ParticipantRow,
   type SessionRow,
+  type SpokenLanguage,
 } from "../db";
 
-/** SQLite participant row → shared Participant DTO. */
-export function toParticipant(row: ParticipantRow): Participant {
+/** SQLite participant row → shared Participant DTO. `lang` is the participant's
+ *  configured spoken language, surfaced only when explicitly set (not `auto`). */
+export function toParticipant(row: ParticipantRow, lang?: SpokenLanguage): Participant {
   return {
     id: row.user_id,
     name: row.username,
     joinedAt: row.joined_at,
     leftAt: row.left_at ?? undefined,
+    lang: lang && lang !== "auto" ? lang : undefined,
   };
 }
 
 /** Session row → history list item (participants + duration + summary flag). */
 export function toSessionListItem(row: SessionRow): SessionListItem {
+  const langByUser = userLanguage.mapByGuild(row.guild_id);
   return {
     id: row.id,
     guildId: row.guild_id,
@@ -35,7 +40,9 @@ export function toSessionListItem(row: SessionRow): SessionListItem {
     startedAt: row.started_at,
     endedAt: row.ended_at ?? undefined,
     durationMs: row.ended_at != null ? row.ended_at - row.started_at : undefined,
-    participants: participants.listBySession(row.id).map(toParticipant),
+    participants: participants
+      .listBySession(row.id)
+      .map((p) => toParticipant(p, langByUser[p.user_id])),
     hasSummary: summaries.get(row.id) != null,
   };
 }

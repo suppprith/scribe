@@ -1,7 +1,7 @@
 import { Client, Events, GatewayIntentBits } from "discord.js";
 import { AudioChunker, ChunkQueue } from "./audio";
 import { config } from "./config";
-import { captions, initDb } from "./db";
+import { captions, initDb, sessions, userLanguage } from "./db";
 import { handleInteraction } from "./discord/interactions";
 import { registerCommands } from "./discord/registerCommands";
 import { deliverSummary } from "./summary";
@@ -36,6 +36,15 @@ const chunker = new AudioChunker({ onChunk: (chunk) => chunkQueue.enqueue(chunk)
 const transcriptionWorker = new TranscriptionWorker({
   queue: chunkQueue,
   transcribe: (wav, language) => transcribeChunk(config.nlpServiceUrl, wav, { language }),
+  // Route each chunk to ASR with the speaker's configured language (looked up
+  // per chunk so a mid-session /scribe lang change applies immediately). `auto`
+  // (or an unknown session) falls back to Whisper detection.
+  resolveLanguage: (chunk) => {
+    const session = sessions.get(chunk.sessionId);
+    if (!session) return undefined;
+    const lang = userLanguage.get(session.guild_id, chunk.userId);
+    return lang === "auto" ? undefined : lang;
+  },
   onCaption: (caption) => {
     // Only finals are persisted; the live broadcast carries the same caption.
     captions.insert({

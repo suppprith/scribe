@@ -2,6 +2,7 @@
 
 import Link from "next/link";
 import { useParams } from "next/navigation";
+import { LanguageBadge } from "@/components/LanguageBadge";
 import { LiveCaptions } from "@/components/LiveCaptions";
 import { SpeakerAvatar } from "@/components/SpeakerAvatar";
 import { useLiveCaptions } from "@/lib/useLiveCaptions";
@@ -46,6 +47,7 @@ export default function LiveViewPage() {
                 >
                   <SpeakerAvatar userId={p.id} name={p.name} size={24} />
                   {p.name}
+                  <LanguageBadge code={p.lang} />
                 </span>
               );
             })}

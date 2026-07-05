@@ -5,9 +5,18 @@ import {
   PermissionFlagsBits,
   SlashCommandBuilder,
 } from "discord.js";
-import { guildConfig, participants, sessions, summaries } from "../db";
+import { guildConfig, participants, sessions, summaries, userLanguage } from "../db";
+import { type SpokenLanguage, isSpokenLanguage } from "../db";
 import { buildSummaryEmbed, type SummaryResult } from "../summary";
 import type { Command } from "./types";
+
+/** Human-readable labels for the spoken-language choices. */
+const LANGUAGE_LABELS: Record<SpokenLanguage, string> = {
+  auto: "Auto-detect",
+  en: "English",
+  hi: "Hindi",
+  th: "Thai",
+};
 
 const data = new SlashCommandBuilder()
   .setName("scribe")
@@ -51,6 +60,26 @@ const data = new SlashCommandBuilder()
           .setDescription("The text channel for summaries.")
           .addChannelTypes(ChannelType.GuildText)
           .setRequired(true),
+      ),
+  )
+  .addSubcommand((sub) =>
+    sub
+      .setName("lang")
+      .setDescription("Set a member's spoken language (for transcription + translation).")
+      .addUserOption((opt) =>
+        opt.setName("user").setDescription("The member whose language to set.").setRequired(true),
+      )
+      .addStringOption((opt) =>
+        opt
+          .setName("language")
+          .setDescription("Their spoken language. 'Auto-detect' lets Whisper decide per chunk.")
+          .setRequired(true)
+          .addChoices(
+            { name: "Auto-detect", value: "auto" },
+            { name: "English", value: "en" },
+            { name: "Hindi", value: "hi" },
+            { name: "Thai", value: "th" },
+          ),
       ),
   )
   .addSubcommand((sub) =>
@@ -142,6 +171,25 @@ async function execute(interaction: ChatInputCommandInteraction): Promise<void> 
       });
       await interaction.reply({
         content: `Summaries will be posted to <#${channel.id}>.`,
+        ...ephemeral,
+      });
+      return;
+    }
+
+    case "lang": {
+      const user = interaction.options.getUser("user", true);
+      const language = interaction.options.getString("language", true);
+      if (!isSpokenLanguage(language)) {
+        await interaction.reply({ content: `Unsupported language \`${language}\`.`, ...ephemeral });
+        return;
+      }
+      userLanguage.set(guildId, user.id, language);
+      const detail =
+        language === "auto"
+          ? "scribe will auto-detect their language on each chunk."
+          : `scribe will transcribe their speech as ${LANGUAGE_LABELS[language]} and translate it to English.`;
+      await interaction.reply({
+        content: `Set ${user}'s language to **${LANGUAGE_LABELS[language]}**. ${detail}`,
         ...ephemeral,
       });
       return;
