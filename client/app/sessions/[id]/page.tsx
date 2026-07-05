@@ -88,14 +88,12 @@ export default function SessionDetailPage() {
               Watch live
             </Link>
           )}
-          {session.hasSummary && (
-            <Link
-              href={`/sessions/${session.id}/summary`}
-              className="rounded-md border border-border px-3 py-1.5 text-sm hover:border-accent/50"
-            >
-              View summary
-            </Link>
-          )}
+          <Link
+            href={`/sessions/${session.id}/summary`}
+            className="rounded-md border border-border px-3 py-1.5 text-sm hover:border-accent/50"
+          >
+            View summary
+          </Link>
           {session.driveLinks.map((link) => (
             <a
               key={link.kind}
