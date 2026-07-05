@@ -2,7 +2,8 @@
 
 from __future__ import annotations
 
-from fastapi import APIRouter
+from fastapi import APIRouter, HTTPException
+from fastapi.concurrency import run_in_threadpool
 from pydantic import BaseModel, Field
 
 from app.nlp.embeddings import most_similar, vectors_for
@@ -13,6 +14,7 @@ from app.nlp.nlg import generate_summary
 from app.nlp.normalize import normalize_text
 from app.nlp.parse import parse
 from app.nlp.tokenize import tokenize
+from app.nlp.translate import ModelUnavailableError, UnsupportedPairError, translate
 from app.nlp.wordnet_wsd import disambiguate
 
 router = APIRouter(prefix="/nlp", tags=["nlp"])
@@ -289,3 +291,29 @@ def nlp_similar(body: SimilarIn) -> SimilarResult:
         min_count=body.min_count,
     )
     return SimilarResult(word=body.word, similar=similar)
+
+
+class TranslateIn(BaseModel):
+    text: str
+    # ISO 639-1 source language (e.g. "hi", "th"). Target defaults to English.
+    src: str
+    tgt: str = "en"
+
+
+class TranslateResult(BaseModel):
+    translatedText: str
+    src: str
+    tgt: str
+
+
+@router.post("/translate", response_model=TranslateResult)
+async def nlp_translate(body: TranslateIn) -> TranslateResult:
+    """Translate one text between a supported language pair. The model is chosen
+    from (src, tgt); unsupported pairs return 400, a missing model returns 503."""
+    try:
+        translated = await run_in_threadpool(translate, body.text, body.src, body.tgt)
+    except UnsupportedPairError as err:
+        raise HTTPException(status_code=400, detail=str(err)) from err
+    except ModelUnavailableError as err:
+        raise HTTPException(status_code=503, detail=str(err)) from err
+    return TranslateResult(translatedText=translated, src=body.src.lower(), tgt=body.tgt.lower())

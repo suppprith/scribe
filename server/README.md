@@ -30,9 +30,15 @@ python -m venv .venv
 # Windows:        .venv\Scripts\activate
 # macOS / Linux:  source .venv/bin/activate
 pip install -r requirements.txt
-python scripts/download_models.py   # NLTK data + spaCy en_core_web_sm (one-time)
+python scripts/download_models.py   # NLTK data + spaCy model + MarianMT convert (one-time)
 cp .env.example .env
 ```
+
+`download_models.py` also converts the MarianMT translation models to int8
+CTranslate2 format (into `TRANSLATION_MODELS_DIR`, default `./models`). That
+one-time conversion loads the source weights via `transformers`, so it needs a
+backend — `pip install torch` (CPU) is enough. Inference afterwards is pure
+`ctranslate2`, no PyTorch.
 
 Run the service:
 
@@ -109,6 +115,17 @@ reused by both an HTTP endpoint (`app/api/nlp.py`) and a standalone demo script
 | IR search (TF-IDF + P/R/F/MAP) | `POST /nlp/search`, `/nlp/ir-metrics` | `scripts/nlp/ir_demo.py` | transcript search + extractive ranking |
 | Template NLG summarizer | `POST /nlp/nlg` | `scripts/nlp/nlg_demo.py` | meeting summaries (no external LLM) |
 | Word2Vec embeddings | `POST /nlp/embeddings`, `/nlp/similar` | `scripts/nlp/word2vec_demo.py` | semantic search / clustering |
+| Machine translation (MarianMT) | `POST /nlp/translate` | `scripts/nlp/translate_demo.py` | Hindi/Thai → English captions, transcripts, summaries |
+
+### Translation
+
+`POST /nlp/translate` takes `{ text, src, tgt }` (ISO 639-1 codes; `tgt` defaults
+to `en`) and returns `{ translatedText, src, tgt }`. The model is picked from the
+`(src, tgt)` pair — supported pairs are `hi→en`, `th→en`, and `en→hi`
+(the standalone-demo direction). An unsupported pair returns `400`; a supported
+pair whose model hasn't been converted yet returns `503`. Same-language and empty
+text pass straight through. Models are MarianMT `opus-mt` run on CTranslate2
+(CPU + int8), lazy-loaded and kept warm like the ASR models.
 
 ### Summarization pipeline
 
@@ -133,4 +150,5 @@ python scripts/nlp/ngram_demo.py
 python scripts/nlp/wordnet_demo.py
 python scripts/nlp/ir_demo.py
 python scripts/nlp/nlg_demo.py
+python scripts/nlp/translate_demo.py
 ```

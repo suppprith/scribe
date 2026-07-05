@@ -29,5 +29,10 @@ class Settings(BaseSettings):
     asr_min_audio_ms: int = 200  # shorter clips are treated as empty
     asr_silence_peak: float = 0.01  # peak amplitude (0..1) below which = silence
 
+    # Translation (MarianMT via CTranslate2, int8). Converted models live under
+    # this directory, one per model name (see scripts/download_models.py). Reuses
+    # `device`/`compute_type` above so it shares the ASR runtime profile.
+    translation_models_dir: str = "./models"
+
 
 settings = Settings()
