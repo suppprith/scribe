@@ -41,4 +41,11 @@ export const sessions = {
   listActive(): SessionRow[] {
     return q<SessionRow>(`SELECT * FROM sessions WHERE status = 'active'`).all();
   },
+
+  /** Most recent sessions across all guilds (newest first) — powers history. */
+  listRecent(limit = 100): SessionRow[] {
+    return q<SessionRow>(
+      `SELECT * FROM sessions ORDER BY started_at DESC LIMIT ?`,
+    ).all(limit);
+  },
 };

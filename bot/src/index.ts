@@ -8,6 +8,7 @@ import { deliverSummary } from "./summary";
 import { TranscriptionWorker, transcribeChunk } from "./transcription";
 import { SessionManager, createDiscordVoiceGateway, createVoiceStateHandler } from "./voice";
 import { startCaptionServer } from "./ws";
+import { startHttpServer } from "./http";
 
 // Config is validated on import; bring up the data layer before Discord.
 initDb();
@@ -18,6 +19,10 @@ const captionServer = startCaptionServer({
   authToken: config.wsAuthToken,
 });
 console.log(`[scribe] WebSocket server listening on :${captionServer.port}`);
+
+// Read-only HTTP API the web client uses for history, transcripts, and summaries.
+const httpServer = startHttpServer({ port: config.httpPort });
+console.log(`[scribe] HTTP API listening on :${httpServer.port}`);
 
 const client = new Client({
   intents: [GatewayIntentBits.Guilds, GatewayIntentBits.GuildVoiceStates],
@@ -77,6 +82,7 @@ const shutdown = async (signal: NodeJS.Signals) => {
     transcriptionWorker.stop();
     sessionManager.endAll();
     captionServer.stop();
+    httpServer.stop();
     await client.destroy();
   } finally {
     process.exit(0);
