@@ -1,6 +1,7 @@
-import type { MeetingSummary } from "@scribe/shared";
+import type { MeetingSummary, SearchMode } from "@scribe/shared";
 import { sessions, summaries } from "../db";
 import { toSessionDetail, toSessionListItem, toSessionTranscript } from "./mappers";
+import { searchTranscript } from "./search";
 
 const CORS_HEADERS: Record<string, string> = {
   "Access-Control-Allow-Origin": "*",
@@ -34,11 +35,12 @@ export interface HttpServer {
  *   GET /api/sessions/:id                 → SessionDetail
  *   GET /api/sessions/:id/transcript      → SessionTranscript
  *   GET /api/sessions/:id/summary         → MeetingSummary (404 if not generated)
+ *   GET /api/sessions/:id/search?q=&mode= → SearchResponse (keyword | semantic)
  */
-export function startHttpServer(opts: { port: number }): HttpServer {
+export function startHttpServer(opts: { port: number; nlpServiceUrl: string }): HttpServer {
   const server = Bun.serve({
     port: opts.port,
-    fetch(req) {
+    async fetch(req) {
       if (req.method === "OPTIONS") return new Response(null, { status: 204, headers: CORS_HEADERS });
 
       const url = new URL(req.url);
@@ -51,8 +53,8 @@ export function startHttpServer(opts: { port: number }): HttpServer {
         return json(sessions.listRecent().map(toSessionListItem));
       }
 
-      // /api/sessions/:id[/transcript|/summary]
-      const match = /^\/api\/sessions\/([^/]+)(?:\/(transcript|summary))?$/.exec(path);
+      // /api/sessions/:id[/transcript|/summary|/search]
+      const match = /^\/api\/sessions\/([^/]+)(?:\/(transcript|summary|search))?$/.exec(path);
       if (match) {
         const id = decodeURIComponent(match[1]!);
         const sub = match[2];
@@ -63,6 +65,22 @@ export function startHttpServer(opts: { port: number }): HttpServer {
         if (sub === "summary") {
           const summary = summaries.get<MeetingSummary>(id)?.structured ?? null;
           return summary ? json(summary) : notFound("summary not generated");
+        }
+        if (sub === "search") {
+          const query = (url.searchParams.get("q") ?? "").trim();
+          if (!query) return json({ error: "missing query ?q=" }, 400);
+          const mode: SearchMode = url.searchParams.get("mode") === "semantic" ? "semantic" : "keyword";
+          try {
+            const result = await searchTranscript(
+              opts.nlpServiceUrl,
+              toSessionTranscript(id).lines,
+              query,
+              mode,
+            );
+            return json(result);
+          } catch (err) {
+            return json({ error: `search failed: ${(err as Error).message}` }, 502);
+          }
         }
         return json(toSessionDetail(session));
       }

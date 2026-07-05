@@ -75,6 +75,7 @@ export type SearchMode = "keyword" | "semantic";
 export interface SearchHit {
   /** Index into the session's transcript `lines` — used to jump to the match. */
   lineIndex: number;
+  userId: string;
   username: string;
   text: string;
   tsStart: number;

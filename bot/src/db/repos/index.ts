@@ -1,4 +1,5 @@
 export * from "./guildConfig";
+export * from "./userLanguage";
 export * from "./sessions";
 export * from "./participants";
 export * from "./captions";

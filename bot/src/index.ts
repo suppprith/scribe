@@ -21,7 +21,7 @@ const captionServer = startCaptionServer({
 console.log(`[scribe] WebSocket server listening on :${captionServer.port}`);
 
 // Read-only HTTP API the web client uses for history, transcripts, and summaries.
-const httpServer = startHttpServer({ port: config.httpPort });
+const httpServer = startHttpServer({ port: config.httpPort, nlpServiceUrl: config.nlpServiceUrl });
 console.log(`[scribe] HTTP API listening on :${httpServer.port}`);
 
 const client = new Client({

@@ -4,6 +4,8 @@
  */
 import type {
   MeetingSummary,
+  SearchMode,
+  SearchResponse,
   SessionDetail,
   SessionListItem,
   SessionTranscript,
@@ -70,5 +72,11 @@ export const api = {
       if (err instanceof ApiError && err.status === 404) return null;
       throw err;
     }
+  },
+
+  /** Search one session's transcript (keyword TF-IDF or semantic Word2Vec). */
+  search(id: string, query: string, mode: SearchMode): Promise<SearchResponse> {
+    const qs = new URLSearchParams({ q: query, mode });
+    return get<SearchResponse>(`/api/sessions/${encodeURIComponent(id)}/search?${qs}`);
   },
 };

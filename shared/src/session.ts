@@ -11,6 +11,11 @@ export interface Participant {
   joinedAt: number;
   /** Epoch ms when the participant left, if they have. */
   leftAt?: number;
+  /**
+   * Configured spoken language as an ISO 639-1 code (e.g. "hi", "th", "en"),
+   * set via `/scribe lang`. Absent means `auto` — Whisper detects per chunk.
+   */
+  lang?: string;
 }
 
 export interface Session {

@@ -15,6 +15,16 @@ CREATE TABLE IF NOT EXISTS guild_config (
   updated_at         INTEGER NOT NULL
 );
 
+-- Per-user spoken-language setting, scoped to a guild (set via /scribe lang).
+-- Applied as the ASR language hint for that user's chunks; 'auto' means detect.
+CREATE TABLE IF NOT EXISTS user_language (
+  guild_id   TEXT NOT NULL,
+  user_id    TEXT NOT NULL,
+  language   TEXT NOT NULL,                        -- ISO 639-1 code or 'auto'
+  updated_at INTEGER NOT NULL,
+  PRIMARY KEY (guild_id, user_id)
+);
+
 CREATE TABLE IF NOT EXISTS sessions (
   id         TEXT PRIMARY KEY,
   guild_id   TEXT NOT NULL,
