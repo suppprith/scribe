@@ -4,10 +4,6 @@
 
 Everything that touches language — speech-to-text, analysis, translation, and summarization — runs on a **self-hosted NLP pipeline with no paid cloud AI dependencies**. There is no external LLM in the loop; summaries are produced by scribe's own natural-language-generation engine.
 
-<p align="center">
-  <img src="docs/images/live-captions.png" alt="Live captions — speaker-attributed captions streaming in real time" width="800">
-</p>
-
 ## What it does
 
 - **Auto-records the channels you choose.** Admins mark which voice channels scribe should watch. The moment someone joins a watched channel, scribe joins and starts recording — no manual command needed.
@@ -17,10 +13,6 @@ Everything that touches language — speech-to-text, analysis, translation, and 
 - **Custom summaries.** When everyone leaves, scribe builds a structured summary — key topics, decisions, action items, and highlights — using its own NLP pipeline, and posts it to the Discord channel and the dashboard.
 - **Searchable history.** Past meetings, full transcripts, and summaries are browsable and searchable (both keyword and meaning-based search).
 - **Archived to Drive.** Raw audio, transcripts, and summaries are uploaded to Google Drive automatically, with links surfaced in Discord and on the web.
-
-| Transcript with translation toggle | Generated summary |
-|---|---|
-| ![Session transcript](docs/images/session-transcript.png) | ![Meeting summary](docs/images/summary.png) |
 
 ## Architecture
 
@@ -151,7 +143,7 @@ scribe/
 ├── server/     # NLP service — speech-to-text, translation, analysis, summarization
 ├── client/     # Web dashboard — live captions, transcripts, summaries, search
 ├── shared/     # TypeScript types shared by bot and client
-└── docs/       # Demo guide, NLP module reference, screenshots
+└── docs/       # Demo guide, NLP module reference
 ```
 
 Each service has its own README with deeper documentation:
