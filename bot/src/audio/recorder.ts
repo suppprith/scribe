@@ -1,5 +1,8 @@
+import { createLogger } from "../log";
 import type { CapturedSegmentWithSession } from "../voice";
 import { encodeWav } from "./wav";
+
+const log = createLogger("scribe.audio");
 
 /** 16 kHz mono signed-16-bit PCM: 16 samples/ms, 32 bytes/ms. */
 const SAMPLES_PER_MS = 16;
@@ -55,8 +58,8 @@ export class SessionRecorder {
     if (buf.bytes + segment.pcm.length > this.maxBytes) {
       if (!buf.capped) {
         buf.capped = true;
-        console.warn(
-          `[scribe] session ${segment.sessionId} exceeded the audio recording cap — ` +
+        log.warn(
+          `session ${segment.sessionId} exceeded the audio recording cap — ` +
             `remaining audio won't be saved (transcript/summary unaffected)`,
         );
       }

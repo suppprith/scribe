@@ -2,11 +2,15 @@ import type { ServerMessage } from "@scribe/shared";
 import type { Client } from "discord.js";
 import { guildConfig, sessions, summaries } from "../db";
 import type { DriveService } from "../drive";
+import { createLogger } from "../log";
 import { persistSessionToDrive, type PersistedLink } from "../storage/persistSession";
 import { assembleTranscript, backfillTranslations } from "../transcript";
 import { createTranslator } from "../transcription";
+import { withRetry } from "../util/retry";
 import { summarizeTranscript } from "./client";
 import { buildSummaryEmbed } from "./embed";
+
+const log = createLogger("scribe.summary");
 
 /** Minimal recorder surface: produce or drop a session's buffered audio. */
 export interface SessionAudio {
@@ -57,18 +61,24 @@ export async function deliverSummary(deps: DeliverDeps, sessionId: string): Prom
   const durationMs = session.ended_at != null ? session.ended_at - session.started_at : undefined;
 
   if (!transcript.fullText.trim()) {
-    console.log(`[scribe] session ${sessionId} produced no captions — skipping summary`);
+    log.info(`session ${sessionId} produced no captions — skipping summary`);
     deps.recorder?.discard(sessionId);
     return;
   }
 
   try {
-    const summary = await summarizeTranscript(deps.nlpServiceUrl, {
-      transcript: transcript.fullText,
-      utterances: transcript.utterances,
-      participants: transcript.participants,
-      duration_seconds: durationMs != null ? durationMs / 1000 : undefined,
-    });
+    // Retry with backoff: a summary is produced once per meeting, so it's worth
+    // riding out an NLP-service restart rather than losing it.
+    const summary = await withRetry(
+      () =>
+        summarizeTranscript(deps.nlpServiceUrl, {
+          transcript: transcript.fullText,
+          utterances: transcript.utterances,
+          participants: transcript.participants,
+          duration_seconds: durationMs != null ? durationMs / 1000 : undefined,
+        }),
+      { attempts: 4, baseDelayMs: 2000, label: `summarize ${sessionId}` },
+    );
 
     summaries.upsert({ sessionId, structured: summary });
     deps.broadcast({ type: "summary_ready", sessionId, markdown: summary.prose });
@@ -101,11 +111,11 @@ export async function deliverSummary(deps: DeliverDeps, sessionId: string): Prom
         await channel.send({ embeds: [embed] });
         summaries.markPosted(sessionId);
       } else {
-        console.warn(`[scribe] summary channel ${channelId} is not sendable`);
+        log.warn(`summary channel ${channelId} is not sendable`);
       }
     }
   } catch (err) {
-    console.error(`[scribe] summary delivery failed for ${sessionId}:`, err);
+    log.error(`summary delivery failed for ${sessionId}:`, err);
     deps.recorder?.discard(sessionId);
     if (channelId) {
       const channel = await deps.client.channels.fetch(channelId).catch(() => null);

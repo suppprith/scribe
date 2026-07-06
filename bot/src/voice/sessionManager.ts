@@ -1,6 +1,9 @@
 import { randomUUID } from "node:crypto";
 import type { DiscordGatewayAdapterCreator } from "@discordjs/voice";
 import { participants, sessions } from "../db";
+import { createLogger } from "../log";
+
+const log = createLogger("scribe.voice");
 
 /** The minimal surface of a voice connection the manager needs. */
 export interface VoiceConnectionLike {
@@ -130,7 +133,7 @@ export class SessionManager {
         present: new Set(),
       };
       this.active.set(key, session);
-      console.log(`[scribe] session ${sessionId} started in ${key}`);
+      log.info(`session ${sessionId} started in ${key}`);
     }
 
     // A returning participant cancels any pending end.
@@ -169,7 +172,7 @@ export class SessionManager {
   /** End every active session immediately — for graceful shutdown. */
   endAll(): void {
     for (const [key, session] of [...this.active.entries()]) {
-      console.log(`[scribe] session ${session.sessionId} ended in ${key} (shutdown)`);
+      log.info(`session ${session.sessionId} ended in ${key} (shutdown)`);
       this.teardown(key, session);
     }
   }
@@ -182,7 +185,7 @@ export class SessionManager {
       session.endTimer = undefined;
       return;
     }
-    console.log(`[scribe] session ${session.sessionId} ended in ${key}`);
+    log.info(`session ${session.sessionId} ended in ${key}`);
     this.teardown(key, session);
   }
 

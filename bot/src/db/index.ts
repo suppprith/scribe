@@ -1,5 +1,8 @@
 import { config } from "../config";
+import { createLogger } from "../log";
 import { db } from "./client";
+
+const log = createLogger("scribe.db");
 
 /**
  * Bring up the data layer. Importing this module already opens the database and
@@ -7,7 +10,7 @@ import { db } from "./client";
  * and logs where the database lives.
  */
 export function initDb() {
-  console.log(`[scribe] SQLite ready at ${config.dbPath}`);
+  log.info(`SQLite ready at ${config.dbPath}`);
   return db;
 }
 

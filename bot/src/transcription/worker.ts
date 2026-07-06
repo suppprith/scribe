@@ -1,6 +1,9 @@
 import type { Caption } from "@scribe/shared";
 import type { AudioChunk, ChunkQueue } from "../audio";
+import { createLogger } from "../log";
 import type { AsrChunkResult } from "./asrClient";
+
+const log = createLogger("scribe.transcribe");
 
 export interface TranscriptionWorkerOptions {
   queue: ChunkQueue<AudioChunk>;
@@ -70,7 +73,10 @@ export class TranscriptionWorker {
       try {
         await this.handle(chunk);
       } catch (err) {
-        console.error(`[scribe] transcription failed for ${chunk.userId}#${chunk.seq}:`, err);
+        log.error(
+          `transcription failed for session ${chunk.sessionId} ${chunk.userId}#${chunk.seq} — dropping chunk:`,
+          err,
+        );
       }
     }
   }

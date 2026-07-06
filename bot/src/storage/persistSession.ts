@@ -4,7 +4,10 @@ import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { driveLinks, type DriveLinkKind } from "../db";
 import type { DriveService } from "../drive";
+import { createLogger } from "../log";
 import type { SummaryResult } from "../summary/types";
+
+const log = createLogger("scribe.drive");
 
 /** A link surfaced to the Discord embed after a successful upload. */
 export interface PersistedLink {
@@ -87,13 +90,13 @@ export async function persistSessionToDrive(
         driveLinks.add({ sessionId: artifacts.sessionId, kind: spec.kind, url: webViewLink });
         links.push({ label: spec.label, url: webViewLink });
       } catch (err) {
-        console.error(`[scribe] failed to upload ${spec.kind} for ${artifacts.sessionId}:`, err);
+        log.error(`failed to upload ${spec.kind} for ${artifacts.sessionId}:`, err);
       }
     }
 
     return links;
   } catch (err) {
-    console.error(`[scribe] Drive upload failed for session ${artifacts.sessionId}:`, err);
+    log.error(`Drive upload failed for session ${artifacts.sessionId}:`, err);
     return [];
   } finally {
     await rm(dir, { recursive: true, force: true }).catch(() => {});

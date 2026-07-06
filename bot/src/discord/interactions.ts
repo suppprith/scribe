@@ -1,5 +1,8 @@
 import { type Interaction, MessageFlags } from "discord.js";
 import { commandMap } from "../commands";
+import { createLogger } from "../log";
+
+const log = createLogger("scribe.discord");
 
 /** Route an incoming interaction to the matching command's handler. */
 export async function handleInteraction(interaction: Interaction): Promise<void> {
@@ -11,7 +14,7 @@ export async function handleInteraction(interaction: Interaction): Promise<void>
   try {
     await command.execute(interaction);
   } catch (err) {
-    console.error(`[scribe] Error handling /${interaction.commandName}:`, err);
+    log.error(`error handling /${interaction.commandName}:`, err);
     const reply = {
       content: "Something went wrong handling that command.",
       flags: MessageFlags.Ephemeral,

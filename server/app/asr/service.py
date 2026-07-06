@@ -40,9 +40,22 @@ def _resolve_language(language: str | None) -> str | None:
 
 def transcribe(audio: bytes, *, model_name: str, language: str | None = None) -> AsrResult:
     """Transcribe WAV bytes with the named model. Empty/too-short/near-silent
-    audio short-circuits to an empty result without invoking the model."""
-    duration, peak = _wav_stats(audio)
+    audio short-circuits to an empty result without invoking the model, and
+    unparseable (garbage) input yields an empty result rather than a 500 — a
+    bad chunk must never take down a live session."""
     lang = _resolve_language(language)
+
+    try:
+        duration, peak = _wav_stats(audio)
+    except Exception as exc:  # wave.Error, EOFError, struct errors on garbage
+        log.warning("unparseable audio (%d bytes): %s — returning empty result", len(audio), exc)
+        return AsrResult(
+            text="",
+            language=lang or "",
+            language_probability=0.0,
+            duration=0.0,
+            confidence=0.0,
+        )
 
     if duration * 1000.0 < settings.asr_min_audio_ms or peak < settings.asr_silence_peak:
         log.debug("short-circuit: duration=%.3fs peak=%.4f", duration, peak)

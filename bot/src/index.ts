@@ -5,25 +5,39 @@ import { captions, initDb, sessions, userLanguage } from "./db";
 import { handleInteraction } from "./discord/interactions";
 import { registerCommands } from "./discord/registerCommands";
 import { createDriveService } from "./drive";
+import { createLogger } from "./log";
 import { deliverSummary } from "./summary";
 import { TranscriptionWorker, createTranslator, transcribeChunk } from "./transcription";
-import { SessionManager, createDiscordVoiceGateway, createVoiceStateHandler } from "./voice";
+import { withRetry } from "./util/retry";
+import {
+  SessionManager,
+  createDiscordVoiceGateway,
+  createVoiceStateHandler,
+  resumeWatchedChannels,
+} from "./voice";
 import { startCaptionServer } from "./ws";
 import { startHttpServer } from "./http";
 
+const log = createLogger("scribe.bot");
+
 // Config is validated on import; bring up the data layer before Discord.
 initDb();
+
+// A previous crash/restart can leave sessions stuck 'active' with no voice
+// connection behind them — close them so history and /scribe status are honest.
+const stale = sessions.endStale();
+if (stale > 0) log.warn(`closed ${stale} stale session(s) left over from a previous run`);
 
 // Realtime transport for live captions to the web client.
 const captionServer = startCaptionServer({
   port: config.wsPort,
   authToken: config.wsAuthToken,
 });
-console.log(`[scribe] WebSocket server listening on :${captionServer.port}`);
+log.info(`WebSocket server listening on :${captionServer.port}`);
 
 // Read-only HTTP API the web client uses for history, transcripts, and summaries.
 const httpServer = startHttpServer({ port: config.httpPort, nlpServiceUrl: config.nlpServiceUrl });
-console.log(`[scribe] HTTP API listening on :${httpServer.port}`);
+log.info(`HTTP API listening on :${httpServer.port}`);
 
 const client = new Client({
   intents: [GatewayIntentBits.Guilds, GatewayIntentBits.GuildVoiceStates],
@@ -40,14 +54,21 @@ const recorder = new SessionRecorder();
 // Google Drive storage (OAuth2), or null when credentials aren't configured —
 // in which case sessions run exactly as before, just without uploaded artifacts.
 const drive = createDriveService();
-console.log(`[scribe] Google Drive storage ${drive ? "enabled" : "disabled (not configured)"}`);
+log.info(`Google Drive storage ${drive ? "enabled" : "disabled (not configured)"}`);
 
 // Cached translator over the NLP service: Hindi/Thai turns → English.
 const translator = createTranslator(config.nlpServiceUrl);
 
 const transcriptionWorker = new TranscriptionWorker({
   queue: chunkQueue,
-  transcribe: (wav, language) => transcribeChunk(config.nlpServiceUrl, wav, { language }),
+  // Retry transient ASR failures (an NLP-service restart mid-session) with
+  // backoff before giving up on a chunk.
+  transcribe: (wav, language) =>
+    withRetry(() => transcribeChunk(config.nlpServiceUrl, wav, { language }), {
+      attempts: 3,
+      baseDelayMs: 500,
+      label: "asr chunk",
+    }),
   // Route each chunk to ASR with the speaker's configured language (looked up
   // per chunk so a mid-session /scribe lang change applies immediately). `auto`
   // (or an unknown session) falls back to Whisper detection.
@@ -107,16 +128,28 @@ const sessionManager = new SessionManager({
 });
 
 client.once(Events.ClientReady, async (c) => {
-  console.log(`[scribe] bot online as ${c.user.tag}`);
+  log.info(`bot online as ${c.user.tag}`);
   await registerCommands();
+  // Adopt meetings already underway in watched channels (e.g. after a restart).
+  await resumeWatchedChannels(client, sessionManager).catch((err) =>
+    log.error("failed to resume watched channels:", err),
+  );
 });
 
 client.on(Events.InteractionCreate, handleInteraction);
 client.on(Events.VoiceStateUpdate, createVoiceStateHandler(sessionManager));
 
+// Gateway drops are handled by discord.js's automatic reconnect; log the
+// transitions so an outage window is visible in the logs.
+client.on(Events.Error, (err) => log.error("discord client error:", err));
+client.on(Events.ShardDisconnect, (_, shardId) =>
+  log.warn(`discord gateway disconnected (shard ${shardId}) — reconnecting`),
+);
+client.on(Events.ShardResume, (shardId) => log.info(`discord gateway resumed (shard ${shardId})`));
+
 // Graceful shutdown: end every active session and disconnect cleanly.
 const shutdown = async (signal: NodeJS.Signals) => {
-  console.log(`[scribe] ${signal} received — shutting down`);
+  log.info(`${signal} received — shutting down`);
   try {
     transcriptionWorker.stop();
     sessionManager.endAll();

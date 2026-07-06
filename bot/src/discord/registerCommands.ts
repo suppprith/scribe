@@ -1,6 +1,9 @@
 import { REST, Routes } from "discord.js";
 import { commands } from "../commands";
 import { config } from "../config";
+import { createLogger } from "../log";
+
+const log = createLogger("scribe.discord");
 
 /**
  * Register slash commands with Discord at startup. If DISCORD_DEV_GUILD_ID is
@@ -10,9 +13,7 @@ import { config } from "../config";
  */
 export async function registerCommands(): Promise<void> {
   if (!config.discordClientId) {
-    console.warn(
-      "[scribe] DISCORD_CLIENT_ID is not set — skipping slash-command registration.",
-    );
+    log.warn("DISCORD_CLIENT_ID is not set — skipping slash-command registration.");
     return;
   }
 
@@ -28,5 +29,5 @@ export async function registerCommands(): Promise<void> {
   const scope = config.discordDevGuildId
     ? `to dev guild ${config.discordDevGuildId}`
     : "globally";
-  console.log(`[scribe] Registered ${commands.length} slash command(s) ${scope}.`);
+  log.info(`registered ${commands.length} slash command(s) ${scope}.`);
 }

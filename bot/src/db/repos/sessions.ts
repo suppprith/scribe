@@ -42,6 +42,23 @@ export const sessions = {
     return q<SessionRow>(`SELECT * FROM sessions WHERE status = 'active'`).all();
   },
 
+  /**
+   * Close sessions left 'active' by a crash/restart. Their voice connections
+   * are gone, so they can't resume — mark them ended, using the last caption's
+   * end time (the moment the meeting actually stopped being heard) when there
+   * is one, else the session start. Returns how many were closed.
+   */
+  endStale(): number {
+    return q(
+      `UPDATE sessions SET status = 'ended',
+         ended_at = COALESCE(
+           (SELECT MAX(c.ts_end) FROM captions c WHERE c.session_id = sessions.id),
+           started_at
+         )
+       WHERE status = 'active'`,
+    ).run().changes;
+  },
+
   /** Most recent sessions across all guilds (newest first) — powers history. */
   listRecent(limit = 100): SessionRow[] {
     return q<SessionRow>(

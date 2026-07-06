@@ -1,6 +1,9 @@
 import { EndBehaviorType } from "@discordjs/voice";
 import prism from "prism-media";
+import { createLogger } from "../log";
 import { pcm48StereoToPcm16Mono } from "./resample";
+
+const log = createLogger("scribe.voice");
 
 /** One speaker's utterance, decoded to 16 kHz mono PCM and attributed. */
 export interface CapturedSegment {
@@ -115,7 +118,9 @@ export class SessionCapture {
         this.onSegment({ userId, username, pcm, startedAt, endedAt: this.now() });
       }
     });
-    decoded.on("error", () => {
+    decoded.on("error", (err) => {
+      // A corrupt Opus stream loses this utterance only — capture continues.
+      log.warn(`audio decode failed for ${userId} — utterance dropped: ${err.message}`);
       this.capturing.delete(userId);
     });
   }

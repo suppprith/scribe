@@ -5,10 +5,23 @@ import {
   PermissionFlagsBits,
   SlashCommandBuilder,
 } from "discord.js";
+import { config } from "../config";
 import { guildConfig, participants, sessions, summaries, userLanguage } from "../db";
 import { type SpokenLanguage, isSpokenLanguage } from "../db";
 import { buildSummaryEmbed, type SummaryResult } from "../summary";
 import type { Command } from "./types";
+
+/** Probe the NLP service's /health so `/scribe status` reflects reality. */
+async function nlpServiceStatus(): Promise<string> {
+  try {
+    const res = await fetch(`${config.nlpServiceUrl}/health`, {
+      signal: AbortSignal.timeout(1500),
+    });
+    return res.ok ? "🟢 online" : `🟠 unhealthy (HTTP ${res.status})`;
+  } catch {
+    return "🔴 unreachable — captions and summaries are paused";
+  }
+}
 
 /** Human-readable labels for the spoken-language choices. */
 const LANGUAGE_LABELS: Record<SpokenLanguage, string> = {
@@ -196,18 +209,19 @@ async function execute(interaction: ChatInputCommandInteraction): Promise<void> 
     }
 
     case "status": {
+      // The health probe can take up to 1.5s — defer so the reply never expires.
+      await interaction.deferReply({ flags: MessageFlags.Ephemeral });
+      const nlp = await nlpServiceStatus();
+
       const active = sessions.listActive().filter((s) => s.guild_id === guildId);
-      if (active.length === 0) {
-        await interaction.reply({ content: "No active recording sessions.", ...ephemeral });
-        return;
-      }
-      const lines = active.map(
-        (s) => `• <#${s.channel_id}> — started <t:${Math.floor(s.started_at / 1000)}:R>`,
-      );
-      await interaction.reply({
-        content: `**Active sessions (${active.length}):**\n${lines.join("\n")}`,
-        ...ephemeral,
-      });
+      const sessionLines =
+        active.length === 0
+          ? "No active recording sessions."
+          : `**Active sessions (${active.length}):**\n${active
+              .map((s) => `• <#${s.channel_id}> — started <t:${Math.floor(s.started_at / 1000)}:R>`)
+              .join("\n")}`;
+
+      await interaction.editReply({ content: `${sessionLines}\n\nNLP service: ${nlp}` });
       return;
     }
 
