@@ -42,16 +42,6 @@ TRANSLATION_MODELS = {
     "Helsinki-NLP/opus-mt-en-hi": "opus-mt-en-hi",
 }
 
-# Tokenizer files copied alongside the converted model so MarianTokenizer loads
-# fully offline from the local directory afterwards.
-_TOKENIZER_FILES = [
-    "source.spm",
-    "target.spm",
-    "vocab.json",
-    "tokenizer_config.json",
-    "special_tokens_map.json",
-]
-
 # Matches app.config.Settings.translation_models_dir (default "./models").
 MODELS_DIR = Path(os.environ.get("TRANSLATION_MODELS_DIR", "./models"))
 
@@ -77,9 +67,29 @@ def download_spacy() -> None:
     subprocess.run([sys.executable, "-m", "spacy", "download", SPACY_MODEL], check=True)
 
 
+def _converter() -> str:
+    """Path to ct2-transformers-converter in the same environment as this
+    Python. Resolved next to sys.executable rather than by bare name, so the
+    script works even when the venv isn't activated (on Windows the bare name
+    isn't found on PATH in that case)."""
+    exe = Path(sys.executable).with_name("ct2-transformers-converter")
+    for candidate in (exe, exe.with_suffix(".exe")):
+        if candidate.exists():
+            return str(candidate)
+    return "ct2-transformers-converter"  # fall back to PATH lookup
+
+
 def download_translation_models() -> None:
-    """Convert each opus-mt model to int8 CTranslate2 format. Skips a model whose
-    output directory already exists, so re-running is cheap."""
+    """Convert each opus-mt model to int8 CTranslate2 format and save its
+    tokenizer alongside, so MarianTokenizer loads fully offline from the local
+    directory afterwards. Skips a model whose output directory already exists,
+    so re-running is cheap.
+
+    The tokenizer is saved via transformers rather than the converter's
+    --copy_files (the opus-mt repos don't ship every file that option expects,
+    e.g. special_tokens_map.json — save_pretrained generates a complete set)."""
+    from transformers import AutoTokenizer
+
     for model_id, out_name in TRANSLATION_MODELS.items():
         out_dir = MODELS_DIR / out_name
         if out_dir.exists():
@@ -88,18 +98,17 @@ def download_translation_models() -> None:
         print(f"[scribe] translate: converting {model_id} -> {out_dir} (int8)")
         subprocess.run(
             [
-                "ct2-transformers-converter",
+                _converter(),
                 "--model",
                 model_id,
                 "--output_dir",
                 str(out_dir),
                 "--quantization",
                 "int8",
-                "--copy_files",
-                *_TOKENIZER_FILES,
             ],
             check=True,
         )
+        AutoTokenizer.from_pretrained(model_id).save_pretrained(out_dir)
 
 
 def main() -> None:
