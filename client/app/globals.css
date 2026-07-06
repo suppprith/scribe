@@ -1,0 +1,36 @@
+@import "tailwindcss";
+
+/**
+ * scribe design tokens. A calm dark surface with a single accent, exposed as
+ * Tailwind theme colors (e.g. `bg-surface`, `text-accent`) via the `@theme`
+ * block so components stay declarative.
+ */
+@theme {
+  --color-bg: #0b0d12;
+  --color-surface: #12151d;
+  --color-surface-2: #1a1f2b;
+  --color-border: #232936;
+  --color-fg: #e6e8ee;
+  --color-muted: #8b93a7;
+  --color-accent: #6d8bff;
+  --color-online: #3ecf8e;
+  --color-offline: #6b7280;
+  --color-warn: #f0b429;
+  --color-error: #f2555a;
+}
+
+* {
+  box-sizing: border-box;
+}
+
+html,
+body {
+  margin: 0;
+  padding: 0;
+}
+
+body {
+  background: var(--color-bg);
+  color: var(--color-fg);
+  font-family: system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
+}

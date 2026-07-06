@@ -1,0 +1,32 @@
+# scribe NLP service dependencies.
+# Wheels exist for all of these on CPython 3.11 (Windows/macOS/Linux) — no
+# compiler needed. faster-whisper runs on CPU + int8 via CTranslate2.
+
+# Web framework + config
+fastapi>=0.115,<1.0
+uvicorn[standard]>=0.30,<1.0
+pydantic>=2.7,<3.0
+pydantic-settings>=2.3,<3.0
+python-dotenv>=1.0,<2.0
+python-multipart>=0.0.9,<1.0
+
+# Speech-to-text
+faster-whisper>=1.0,<2.0
+
+# Translation (MarianMT via CTranslate2, int8 — same runtime as faster-whisper).
+# ctranslate2 + the Marian tokenizer (transformers + sentencepiece) are enough
+# for inference; no PyTorch at runtime. The one-time model conversion in
+# scripts/download_models.py additionally needs a backend (`pip install torch`).
+ctranslate2>=4.0,<5.0
+transformers>=4.40,<5.0
+sentencepiece>=0.2,<1.0
+
+# NLP toolkit (used by the Phase 2 modules)
+nltk>=3.9,<4.0
+spacy>=3.7,<4.0
+gensim>=4.3,<5.0
+scikit-learn>=1.4,<2.0
+numpy>=1.26,<2.0
+
+# After install, download models/data once:
+#   python scripts/download_models.py

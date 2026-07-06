@@ -1,32 +1,60 @@
-# Environment variables
-.env
-.env.local
-
 # Dependencies
 node_modules/
+.pnp
+.pnp.js
 
-# Build outputs
-dist/
+# Bun
+.bun/
+bun.lockb
+
+# Python
+__pycache__/
+*.py[cod]
+.venv/
+venv/
+env/
+*.egg-info/
+.pytest_cache/
+
+# Next.js
+.next/
+out/
 build/
+dist/
+
+# TypeScript
+*.tsbuildinfo
+
+# Environment
+.env
+.env.*
+!.env.example
+
+# Local data / runtime artifacts
+*.sqlite
+*.sqlite3
+*.db
+recordings/
+tmp/
+/tmp/
+temp/
+*.tmp
+*.wav
+*.pcm
+*.opus
+
+# Models / caches
+models/
+.cache/
 
 # Logs
 *.log
 logs/
 
-# Temporary files
-/tmp/
-*.tmp
-
-# IDE
+# Editor / OS
 .vscode/
 .idea/
 *.swp
 *.swo
-
-# OS
 .DS_Store
 Thumbs.db
-
-# Bun
-.bun/
-bun.lockb
