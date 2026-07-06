@@ -112,7 +112,11 @@ export default function SessionDetailPage() {
 
       <section>
         <h2 className="mb-3 text-lg font-medium">Transcript</h2>
-        <TranscriptView lines={session.transcript.lines} participants={session.participants} />
+        <TranscriptView
+          lines={session.transcript.lines}
+          participants={session.participants}
+          startedAt={session.startedAt}
+        />
       </section>
     </div>
   );

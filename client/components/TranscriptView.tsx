@@ -24,13 +24,18 @@ function badgeLang(lang?: string): string | undefined {
  * as `#line-N` so search results can deep-link to it); "By speaker" groups all
  * of each participant's text together. A translation toggle (Original / English
  * / Both) appears when any turn is in a non-English language.
+ *
+ * Caption timestamps are stored as epoch ms; `startedAt` (the session start)
+ * anchors them so each line shows its offset into the meeting.
  */
 export function TranscriptView({
   lines,
   participants,
+  startedAt,
 }: {
   lines: TranscriptLine[];
   participants: Participant[];
+  startedAt?: number;
 }) {
   const [mode, setMode] = useState<Mode>("merged");
   const [highlight, setHighlight] = useState<number | null>(null);
@@ -106,7 +111,9 @@ export function TranscriptView({
                   <span className="text-sm font-medium" style={{ color: speakerColor(line.userId) }}>
                     {line.username}
                   </span>
-                  <span className="font-mono text-xs text-muted">{formatClock(line.tsStart)}</span>
+                  <span className="font-mono text-xs text-muted">
+                    {formatClock(line.tsStart - (startedAt ?? lines[0]?.tsStart ?? 0))}
+                  </span>
                   <LanguageBadge code={badgeLang(line.lang)} />
                 </div>
                 <p className="text-fg/90">

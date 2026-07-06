@@ -20,6 +20,11 @@ export function formatDuration(ms?: number): string {
   return `${s}s`;
 }
 
+/** Epoch ms → local wall-clock "2:15:07 PM" — for live captions arriving now. */
+export function formatWallClock(ms: number): string {
+  return new Date(ms).toLocaleTimeString(undefined, { timeStyle: "medium" });
+}
+
 /** An offset-from-start in ms → "mm:ss" (or "h:mm:ss" past an hour). */
 export function formatClock(ms: number): string {
   const total = Math.max(0, Math.round(ms / 1000));

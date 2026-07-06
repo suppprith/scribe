@@ -7,7 +7,7 @@ import { LanguageBadge } from "@/components/LanguageBadge";
 import { SpeakerAvatar } from "@/components/SpeakerAvatar";
 import { TranslatedText } from "@/components/TranslatedText";
 import { TranslationControls } from "@/components/TranslationControls";
-import { formatClock } from "@/lib/format";
+import { formatWallClock } from "@/lib/format";
 import { isTranslatable } from "@/lib/lang";
 import { speakerColor } from "@/lib/speaker";
 import { useTranslations } from "@/lib/useTranslations";
@@ -107,7 +107,7 @@ export function LiveCaptions({ captions, live }: { captions: Caption[]; live: bo
                       {g.username}
                     </span>
                     <span className="font-mono text-xs text-muted">
-                      {formatClock(g.captions[0]!.tsStart)}
+                      {formatWallClock(g.captions[0]!.tsStart)}
                     </span>
                     <LanguageBadge code={groupLang} />
                   </div>
