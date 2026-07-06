@@ -1,8 +1,8 @@
 """End-to-end summarization pipeline — the full custom replacement for the old
 Gemini call. Chains the NLP modules into one structured summary:
 
-    tokenize (L1) -> keywords/POS (L3) -> action items via parse (L4)
-    -> extractive highlights via TF-IDF (L9) -> template NLG (L7)
+    tokenize -> keywords/POS -> action items via parsing
+    -> extractive highlights via TF-IDF -> template NLG
 
 Deterministic, CPU-only, no external LLM.
 """

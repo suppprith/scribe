@@ -2,10 +2,9 @@ import type { SearchHit, SearchMode, SearchResponse, TranscriptLine } from "@scr
 
 /**
  * Transcript search, backed by the NLP service. Keyword mode ranks the
- * session's lines with TF-IDF (Lab 9). Semantic mode first expands the query
- * with Word2Vec neighbours drawn from the transcript itself (Lab 10), then
- * ranks with the same TF-IDF index — so "budget" can also surface "cost" or
- * "funding" lines.
+ * session's lines with TF-IDF. Semantic mode first expands the query with
+ * Word2Vec neighbours drawn from the transcript itself, then ranks with the
+ * same TF-IDF index — so "budget" can also surface "cost" or "funding" lines.
  */
 
 interface NlpSearchHit {
