@@ -127,11 +127,49 @@ last subscriber disconnects.
 
 When a session ends, the bot assembles the stored final captions into a
 time-ordered transcript (merged + per-speaker, persisted), POSTs it to the NLP
-service's `/summarize`, and persists the structured result. It then posts a rich
-embed (overview, topics, decisions, action items, participants, duration) to the
-guild's summary channel and broadcasts `summary_ready` to the web. If the NLP
+service's `/summarize`, and persists the structured result. It uploads the
+session's artifacts to Google Drive (below), then posts a rich embed (overview,
+topics, decisions, action items, participants, duration, and storage links) to
+the guild's summary channel and broadcasts `summary_ready` to the web. If the NLP
 service fails, a clear notice is posted instead of losing the summary silently.
 `/scribe summary [session]` re-posts a stored summary on demand.
+
+## Google Drive storage ([`src/drive/`](src/drive), [`src/storage/`](src/storage))
+
+When a session ends, the bot archives three artifacts to Drive: the **recording**
+(a single mixed 16 kHz mono WAV), the **transcript** (`.txt`), and the **summary**
+(`.md`). They're uploaded into a per-server / per-session folder tree
+(`<root>/<guildId>/<date_sessionId>`), each shared "anyone with the link", and
+the links are stored in `drive_links` — surfaced in the Discord embed and on the
+web session page. Files are staged in a temp directory and streamed up, then the
+temp directory is removed, so nothing lingers on disk.
+
+The recording is mixed in memory as the meeting runs by `SessionRecorder`: every
+utterance is placed at its real offset from the session's first sound and the
+overlapping samples are summed (clamped), so a single file reconstructs who spoke
+when. Buffering is capped (~45 min) to protect host memory on long meetings;
+past the cap, transcript and summary are unaffected.
+
+Storage is **optional** — with no Drive credentials the bot logs `storage
+disabled` and runs exactly as before, just without uploaded artifacts. Uploads
+are best-effort: a failure is logged and never blocks summary delivery.
+
+### One-time setup
+
+A service account can't write to a personal "My Drive" (no storage quota), so we
+use an **OAuth2 refresh token** minted from your own Google account. One time:
+
+1. In the Google Cloud Console, enable the **Google Drive API** and create an
+   **OAuth 2.0 Client ID** (type *Web application*).
+2. Add `http://localhost:53682` as an authorized redirect URI.
+3. Put the client id/secret in `bot/.env` (`GOOGLE_DRIVE_CLIENT_ID` /
+   `GOOGLE_DRIVE_CLIENT_SECRET`).
+4. Run `bun run auth:google`, open the printed URL, approve access, and copy the
+   `GOOGLE_DRIVE_REFRESH_TOKEN` it prints back into `bot/.env`.
+
+Optionally set `GOOGLE_DRIVE_FOLDER_ID` to nest all uploads under an existing
+Drive folder. The script requests the least-privilege `drive.file` scope — the
+bot only ever sees files it created.
 
 ## Data layer (SQLite)
 

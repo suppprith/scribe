@@ -1,9 +1,10 @@
 import { Client, Events, GatewayIntentBits } from "discord.js";
-import { AudioChunker, ChunkQueue } from "./audio";
+import { AudioChunker, ChunkQueue, SessionRecorder } from "./audio";
 import { config } from "./config";
 import { captions, initDb, sessions, userLanguage } from "./db";
 import { handleInteraction } from "./discord/interactions";
 import { registerCommands } from "./discord/registerCommands";
+import { createDriveService } from "./drive";
 import { deliverSummary } from "./summary";
 import { TranscriptionWorker, createTranslator, transcribeChunk } from "./transcription";
 import { SessionManager, createDiscordVoiceGateway, createVoiceStateHandler } from "./voice";
@@ -32,6 +33,14 @@ const client = new Client({
 // worker → ASR → persisted caption + live broadcast.
 const chunkQueue = new ChunkQueue(64);
 const chunker = new AudioChunker({ onChunk: (chunk) => chunkQueue.enqueue(chunk) });
+
+// Accumulates each session's utterances into one mixed WAV for Drive archival.
+const recorder = new SessionRecorder();
+
+// Google Drive storage (OAuth2), or null when credentials aren't configured —
+// in which case sessions run exactly as before, just without uploaded artifacts.
+const drive = createDriveService();
+console.log(`[scribe] Google Drive storage ${drive ? "enabled" : "disabled (not configured)"}`);
 
 // Cached translator over the NLP service: Hindi/Thai turns → English.
 const translator = createTranslator(config.nlpServiceUrl);
@@ -76,13 +85,22 @@ transcriptionWorker.start();
 const sessionManager = new SessionManager({
   gateway: createDiscordVoiceGateway({
     client,
-    onSegment: (segment) => chunker.push(segment),
+    onSegment: (segment) => {
+      chunker.push(segment); // → live transcription
+      recorder.add(segment); // → archived recording
+    },
   }),
   onSessionEnd: (info) => {
     captionServer.broadcast({ type: "session_end", sessionId: info.sessionId });
-    // Assemble transcript → summarize → post to Discord → broadcast (fire-and-forget).
+    // Assemble transcript → summarize → upload to Drive → post to Discord (fire-and-forget).
     void deliverSummary(
-      { client, nlpServiceUrl: config.nlpServiceUrl, broadcast: (m) => captionServer.broadcast(m) },
+      {
+        client,
+        nlpServiceUrl: config.nlpServiceUrl,
+        broadcast: (m) => captionServer.broadcast(m),
+        drive,
+        recorder,
+      },
       info.sessionId,
     );
   },
