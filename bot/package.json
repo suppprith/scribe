@@ -8,6 +8,7 @@
     "dev": "bun --watch src/index.ts",
     "start": "bun src/index.ts",
     "auth:google": "bun scripts/google-auth.ts",
+    "seed:demo": "bun scripts/seed-demo.ts",
     "typecheck": "tsc --noEmit"
   },
   "dependencies": {
