@@ -1,22 +1,41 @@
 @import "tailwindcss";
 
 /**
- * scribe design tokens. A calm dark surface with a single accent, exposed as
- * Tailwind theme colors (e.g. `bg-surface`, `text-accent`) via the `@theme`
- * block so components stay declarative.
+ * scribe design system.
+ *
+ * A warm, editorial dark theme built on near-neutral espresso surfaces with a
+ * single confident coral accent — the brand's "highlighter" color. Everything
+ * is exposed as Tailwind theme tokens via `@theme` (e.g. `bg-surface`,
+ * `text-accent`, `border-border`) so components stay declarative and a palette
+ * change here propagates everywhere.
  */
 @theme {
-  --color-bg: #0b0d12;
-  --color-surface: #12151d;
-  --color-surface-2: #1a1f2b;
-  --color-border: #232936;
-  --color-fg: #e6e8ee;
-  --color-muted: #8b93a7;
-  --color-accent: #6d8bff;
-  --color-online: #3ecf8e;
-  --color-offline: #6b7280;
-  --color-warn: #f0b429;
-  --color-error: #f2555a;
+  /* Surfaces — warm charcoal, layered from base to elevated. */
+  --color-bg: #100f0d;
+  --color-surface: #17150f;
+  --color-surface-2: #201d17;
+  --color-elevated: #2a251d;
+
+  /* Lines & text. */
+  --color-border: #2b271f;
+  --color-border-strong: #3b352b;
+  --color-fg: #f4efe6;
+  --color-muted: #a39a89;
+
+  /* Signature accent — coral. Used for the brand, links, primary actions. */
+  --color-accent: #ff6a3d;
+  --color-accent-hover: #ff835c;
+  --color-accent-contrast: #1a0f09;
+
+  /* Semantic status. */
+  --color-online: #37d399;
+  --color-offline: #6b6559;
+  --color-warn: #f2b34b;
+  --color-error: #f26a5f;
+
+  /* Typography — wired to the next/font faces loaded in layout.tsx. */
+  --font-sans: var(--font-dm-sans), system-ui, -apple-system, "Segoe UI", sans-serif;
+  --font-mono: var(--font-dm-mono), ui-monospace, "SFMono-Regular", monospace;
 }
 
 * {
@@ -30,7 +49,46 @@ body {
 }
 
 body {
-  background: var(--color-bg);
+  min-height: 100vh;
   color: var(--color-fg);
-  font-family: system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
+  font-family: var(--font-sans);
+  font-feature-settings: "ss01", "cv01";
+  /* Solid warm base with a soft coral glow bleeding down from the top so the
+     page has depth without the flat, generic look. */
+  background-color: var(--color-bg);
+  background-image: radial-gradient(
+    1100px 520px at 50% -260px,
+    color-mix(in oklab, var(--color-accent) 10%, transparent),
+    transparent 70%
+  );
+  background-attachment: fixed;
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+  text-rendering: optimizeLegibility;
+}
+
+::selection {
+  background: color-mix(in oklab, var(--color-accent) 32%, transparent);
+  color: var(--color-fg);
+}
+
+/* Quiet, on-brand scrollbars. */
+* {
+  scrollbar-width: thin;
+  scrollbar-color: var(--color-border-strong) transparent;
+}
+*::-webkit-scrollbar {
+  width: 10px;
+  height: 10px;
+}
+*::-webkit-scrollbar-thumb {
+  background: var(--color-border-strong);
+  border: 3px solid transparent;
+  background-clip: padding-box;
+  border-radius: 9999px;
+}
+*::-webkit-scrollbar-thumb:hover {
+  background: var(--color-muted);
+  border: 3px solid transparent;
+  background-clip: padding-box;
 }

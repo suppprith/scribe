@@ -4,14 +4,14 @@
  * user id keeps contrast readable on the dark surface.
  */
 const PALETTE = [
-  "#6d8bff", // blue
-  "#3ecf8e", // green
-  "#f0b429", // amber
-  "#f2555a", // red
-  "#c084fc", // purple
-  "#22d3ee", // cyan
-  "#fb7185", // pink
-  "#a3e635", // lime
+  "#ff8a5c", // coral (brand)
+  "#37d399", // emerald
+  "#f2b34b", // amber
+  "#7aa2ff", // periwinkle
+  "#c88bfc", // orchid
+  "#3ec8d8", // teal
+  "#fb7185", // rose
+  "#b6d95c", // olive-lime
 ];
 
 function hash(input: string): number {
