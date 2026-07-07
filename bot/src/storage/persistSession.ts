@@ -2,6 +2,8 @@ import { createReadStream } from "node:fs";
 import { mkdtemp, rm, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
+import type { Readable } from "node:stream";
+import type { Recording } from "../audio";
 import { driveLinks, type DriveLinkKind } from "../db";
 import type { DriveService } from "../drive";
 import { createLogger } from "../log";
@@ -20,20 +22,11 @@ export interface SessionArtifacts {
   sessionId: string;
   /** Human-readable Drive folder name for this session (under the guild folder). */
   folderName: string;
-  /** Mixed meeting recording as WAV bytes, or null when no audio was captured. */
-  audioWav: Buffer | null;
+  /** Encoded meeting recording on disk, or null when no audio was captured. */
+  audio: Recording | null;
   /** Assembled "Speaker: text" transcript. */
   transcriptText: string;
   summary: SummaryResult;
-}
-
-interface Artifact {
-  kind: DriveLinkKind;
-  label: string;
-  fileName: string;
-  mimeType: string;
-  /** null skips this artifact (e.g. no audio captured). */
-  content: Buffer | string | null;
 }
 
 /** Render the structured summary as a readable Markdown document. */
@@ -54,8 +47,9 @@ function renderSummary(s: SummaryResult): string {
 /**
  * Upload a session's recording, transcript, and summary to Drive, persist the
  * resulting shareable links in `drive_links`, and return them for the Discord
- * embed. Files are staged in a temp directory and streamed up, then the temp
- * directory is always removed — so nothing lingers on disk after the upload.
+ * embed. Text artifacts are staged in a temp directory and streamed up; the
+ * recording is already an Ogg Opus file on disk and is streamed directly. Every
+ * temp file — staging dir and the recording — is removed afterward.
  *
  * Best-effort per artifact: if one upload fails the others still go through, and
  * a total failure (e.g. folder creation) is logged and yields no links rather
@@ -65,33 +59,41 @@ export async function persistSessionToDrive(
   drive: DriveService,
   artifacts: SessionArtifacts,
 ): Promise<PersistedLink[]> {
-  const specs: Artifact[] = [
-    { kind: "audio", label: "Audio", fileName: "recording.wav", mimeType: "audio/wav", content: artifacts.audioWav },
-    { kind: "transcript", label: "Transcript", fileName: "transcript.txt", mimeType: "text/plain", content: artifacts.transcriptText },
-    { kind: "summary", label: "Summary", fileName: "summary.md", mimeType: "text/markdown", content: renderSummary(artifacts.summary) },
-  ];
-
   const dir = await mkdtemp(join(tmpdir(), `scribe-${artifacts.sessionId}-`));
   try {
     const folderId = await drive.ensureFolderPath([artifacts.guildId, artifacts.folderName]);
     const links: PersistedLink[] = [];
 
-    for (const spec of specs) {
-      if (spec.content === null) continue;
-      const path = join(dir, spec.fileName);
+    const upload = async (
+      kind: DriveLinkKind,
+      label: string,
+      fileName: string,
+      mimeType: string,
+      data: Readable,
+    ): Promise<void> => {
       try {
-        await writeFile(path, spec.content);
-        const { webViewLink } = await drive.uploadFile({
-          folderId,
-          name: spec.fileName,
-          mimeType: spec.mimeType,
-          data: createReadStream(path),
-        });
-        driveLinks.add({ sessionId: artifacts.sessionId, kind: spec.kind, url: webViewLink });
-        links.push({ label: spec.label, url: webViewLink });
+        const { webViewLink } = await drive.uploadFile({ folderId, name: fileName, mimeType, data });
+        driveLinks.add({ sessionId: artifacts.sessionId, kind, url: webViewLink });
+        links.push({ label, url: webViewLink });
       } catch (err) {
-        log.error(`failed to upload ${spec.kind} for ${artifacts.sessionId}:`, err);
+        log.error(`failed to upload ${kind} for ${artifacts.sessionId}:`, err);
       }
+    };
+
+    // The recording is already encoded on disk — stream it straight up.
+    if (artifacts.audio) {
+      await upload("audio", "Audio", artifacts.audio.fileName, artifacts.audio.mimeType, createReadStream(artifacts.audio.path));
+    }
+
+    // Text artifacts: write to the staging dir, then stream up.
+    const textArtifacts: { kind: DriveLinkKind; label: string; fileName: string; mimeType: string; content: string }[] = [
+      { kind: "transcript", label: "Transcript", fileName: "transcript.txt", mimeType: "text/plain", content: artifacts.transcriptText },
+      { kind: "summary", label: "Summary", fileName: "summary.md", mimeType: "text/markdown", content: renderSummary(artifacts.summary) },
+    ];
+    for (const spec of textArtifacts) {
+      const path = join(dir, spec.fileName);
+      await writeFile(path, spec.content);
+      await upload(spec.kind, spec.label, spec.fileName, spec.mimeType, createReadStream(path));
     }
 
     return links;
@@ -100,5 +102,6 @@ export async function persistSessionToDrive(
     return [];
   } finally {
     await rm(dir, { recursive: true, force: true }).catch(() => {});
+    if (artifacts.audio) await rm(artifacts.audio.path, { force: true }).catch(() => {});
   }
 }

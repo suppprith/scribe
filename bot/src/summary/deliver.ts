@@ -1,5 +1,6 @@
 import type { ServerMessage } from "@scribe/shared";
 import type { Client } from "discord.js";
+import type { Recording } from "../audio";
 import { guildConfig, sessions, summaries } from "../db";
 import type { DriveService } from "../drive";
 import { createLogger } from "../log";
@@ -14,7 +15,7 @@ const log = createLogger("scribe.summary");
 
 /** Minimal recorder surface: produce or drop a session's buffered audio. */
 export interface SessionAudio {
-  finalize(sessionId: string): Buffer | null;
+  finalize(sessionId: string): Promise<Recording | null>;
   discard(sessionId: string): void;
 }
 
@@ -87,11 +88,12 @@ export async function deliverSummary(deps: DeliverDeps, sessionId: string): Prom
     // is disabled we still release the recorder's buffered audio.
     let links: PersistedLink[] = [];
     if (deps.drive) {
+      const audio = deps.recorder ? await deps.recorder.finalize(sessionId) : null;
       links = await persistSessionToDrive(deps.drive, {
         guildId: session.guild_id,
         sessionId,
         folderName: folderNameFor(session.started_at, sessionId),
-        audioWav: deps.recorder?.finalize(sessionId) ?? null,
+        audio,
         transcriptText: transcript.fullText,
         summary,
       });
