@@ -1,7 +1,10 @@
-import { joinVoiceChannel } from "@discordjs/voice";
+import { VoiceConnectionStatus, joinVoiceChannel } from "@discordjs/voice";
 import type { Client } from "discord.js";
 import { type CaptureReceiver, type CapturedSegment, SessionCapture } from "./capture";
 import type { VoiceGateway } from "./sessionManager";
+import { createLogger } from "../log";
+
+const log = createLogger("scribe.voice");
 
 /** A captured utterance tagged with the session it belongs to. */
 export interface CapturedSegmentWithSession extends CapturedSegment {
@@ -29,6 +32,14 @@ export function createDiscordVoiceGateway(deps: DiscordVoiceGatewayDeps): VoiceG
         selfDeaf: false,
         selfMute: true,
       });
+
+      // Surface voice-connection trouble (e.g. Discord's 4017 "DAVE required"
+      // close, network drops) — otherwise a failed connection is silent and no
+      // audio is ever captured.
+      connection.on("error", (err) => log.warn(`voice connection error: ${err.message}`));
+      connection.on(VoiceConnectionStatus.Disconnected, () =>
+        log.warn(`voice connection dropped in ${guildId}:${channelId}`),
+      );
 
       const capture = new SessionCapture({
         receiver: connection.receiver as unknown as CaptureReceiver,
