@@ -50,8 +50,18 @@ export function stitch(prev: string, next: string): string {
  * being overwhelmed; per-speaker stitching drops duplicate/overlapping text.
  */
 export class TranscriptionWorker {
+  /**
+   * Reuse a speaker's already-detected language for this many chunks before
+   * letting the model detect again. Detection costs about as much as the
+   * transcription itself, but a speaker can switch language mid-meeting, so it
+   * must not stick forever.
+   */
+  private static readonly LANGUAGE_REUSE_LIMIT = 8;
+
   private running = false;
   private readonly lastText = new Map<string, string>();
+  /** Per-speaker detected language and how many chunks it has been reused for. */
+  private readonly detected = new Map<string, { code: string; uses: number }>();
 
   constructor(private readonly options: TranscriptionWorkerOptions) {}
 
@@ -81,13 +91,36 @@ export class TranscriptionWorker {
     }
   }
 
+  /** The speaker's configured language, else their recently detected one. */
+  private languageHint(key: string, configured: string | undefined): string | undefined {
+    if (configured) return configured;
+    const entry = this.detected.get(key);
+    return entry && entry.uses < TranscriptionWorker.LANGUAGE_REUSE_LIMIT ? entry.code : undefined;
+  }
+
+  /** Track the detected language so the next chunks can skip detection. */
+  private rememberLanguage(key: string, hint: string | undefined, result: AsrChunkResult): void {
+    const entry = this.detected.get(key);
+    if (hint && entry) {
+      entry.uses++;
+      return;
+    }
+    // Only trust a confident detection — a bad guess would pin the wrong
+    // language (and so the wrong translation) for the next several chunks.
+    if (result.language && result.language_probability >= 0.85) {
+      this.detected.set(key, { code: result.language, uses: 0 });
+    }
+  }
+
   private async handle(chunk: AudioChunk): Promise<void> {
-    const language = this.options.resolveLanguage?.(chunk);
-    const result = await this.options.transcribe(chunk.wav, language);
+    const key = `${chunk.sessionId}:${chunk.userId}`;
+    const configured = this.options.resolveLanguage?.(chunk);
+    const hint = this.languageHint(key, configured);
+    const result = await this.options.transcribe(chunk.wav, hint);
+    if (!configured) this.rememberLanguage(key, hint, result);
     const text = result.text.trim();
     if (!text) return;
 
-    const key = `${chunk.sessionId}:${chunk.userId}`;
     const stitched = stitch(this.lastText.get(key) ?? "", text).trim();
     this.lastText.set(key, text);
     if (!stitched) return; // duplicate of the previous chunk
