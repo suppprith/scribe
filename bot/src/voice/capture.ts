@@ -44,10 +44,22 @@ export interface SessionCaptureOptions {
   onSegment: (segment: CapturedSegment) => void;
   /** Silence (ms) that ends an utterance. Default 800. */
   silenceMs?: number;
+  /**
+   * Emit a segment once this much audio has accumulated, without waiting for the
+   * speaker to pause. Keeps live captions flowing during long uninterrupted
+   * speech instead of arriving in one burst when the utterance finally ends.
+   * Default 2500.
+   */
+  flushMs?: number;
   now?: () => number;
   /** Opus→PCM(48k stereo) decoder factory. Injected in tests. */
   createDecoder?: () => Decoder;
 }
+
+/** Decoded Discord voice: 48 kHz × 2 channels × 2 bytes = 192 bytes per ms. */
+const DECODED_BYTES_PER_MS = 192;
+/** Output PCM: 16 kHz mono × 2 bytes = 32 bytes per ms. */
+const PCM16_BYTES_PER_MS = 32;
 
 const defaultCreateDecoder = (): Decoder =>
   new prism.opus.Decoder({ rate: 48_000, channels: 2, frameSize: 960 });
@@ -63,6 +75,7 @@ export class SessionCapture {
   private readonly resolveUsername: (userId: string) => string;
   private readonly onSegment: (segment: CapturedSegment) => void;
   private readonly silenceMs: number;
+  private readonly flushMs: number;
   private readonly now: () => number;
   private readonly createDecoder: () => Decoder;
 
@@ -76,6 +89,7 @@ export class SessionCapture {
     this.resolveUsername = options.resolveUsername;
     this.onSegment = options.onSegment;
     this.silenceMs = options.silenceMs ?? 800;
+    this.flushMs = options.flushMs ?? 2500;
     this.now = options.now ?? Date.now;
     this.createDecoder = options.createDecoder ?? defaultCreateDecoder;
   }
@@ -109,14 +123,33 @@ export class SessionCapture {
     });
     const decoded = opus.pipe(this.createDecoder());
 
-    const chunks: Buffer[] = [];
-    decoded.on("data", (chunk: Buffer) => chunks.push(chunk));
+    const flushBytes = this.flushMs * DECODED_BYTES_PER_MS;
+    let pending: Buffer[] = [];
+    let pendingBytes = 0;
+    // Audio already emitted for this utterance, in ms — segment timestamps are
+    // derived from the audio itself so consecutive pieces line up exactly.
+    let emittedMs = 0;
+
+    const emit = (): void => {
+      if (pendingBytes === 0) return;
+      const pcm = pcm48StereoToPcm16Mono(Buffer.concat(pending, pendingBytes));
+      pending = [];
+      pendingBytes = 0;
+      if (pcm.length === 0) return;
+      const tsStart = startedAt + emittedMs;
+      emittedMs += Math.round(pcm.length / PCM16_BYTES_PER_MS);
+      this.onSegment({ userId, username, pcm, startedAt: tsStart, endedAt: startedAt + emittedMs });
+    };
+
+    decoded.on("data", (chunk: Buffer) => {
+      pending.push(chunk);
+      pendingBytes += chunk.length;
+      // Long speech is emitted as it happens rather than held until the pause.
+      if (pendingBytes >= flushBytes) emit();
+    });
     decoded.on("end", () => {
       if (!this.capturing.delete(userId)) return;
-      const pcm = pcm48StereoToPcm16Mono(Buffer.concat(chunks));
-      if (pcm.length > 0) {
-        this.onSegment({ userId, username, pcm, startedAt, endedAt: this.now() });
-      }
+      emit();
     });
     decoded.on("error", (err) => {
       // A corrupt Opus stream loses this utterance only — capture continues.
